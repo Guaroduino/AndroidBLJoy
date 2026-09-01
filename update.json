@@ -2,6 +2,6 @@
   "versionCode": 15,
   "versionName": "1.14",
   "apkUrl": "https://storage.googleapis.com/androidblejoy.firebasestorage.app/updates/app-debug.apk",
-  "releaseNotes": "Refactorización a Transmisor RC estándar con 5 pestañas, telemetría gráfica en tiempo real y Model Match.",
+  "releaseNotes": "Refactorización completa a Transmisor RC estándar con 5 pestañas, telemetría PWM en tiempo real y Model Match BLE.",
   "forceUpdate": false
 }
