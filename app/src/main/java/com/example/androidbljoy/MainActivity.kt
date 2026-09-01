@@ -15,6 +15,7 @@ import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import com.example.androidbljoy.data.BluetoothService
+import com.example.androidbljoy.data.repository.ModelRepository
 import com.example.androidbljoy.theme.AndroidBLJoyTheme
 import com.example.androidbljoy.ui.main.MainScreenViewModel
 
@@ -29,7 +30,10 @@ class MainActivity : ComponentActivity() {
     object : ViewModelProvider.Factory {
       @Suppress("UNCHECKED_CAST")
       override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return MainScreenViewModel(BluetoothService.getInstance(this@MainActivity)) as T
+        return MainScreenViewModel(
+            BluetoothService.getInstance(this@MainActivity),
+            ModelRepository.getInstance(this@MainActivity)
+        ) as T
       }
     }
   }

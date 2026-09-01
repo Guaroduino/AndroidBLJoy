@@ -5,6 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.androidbljoy.data.BluetoothDeviceInfo
 import com.example.androidbljoy.data.BluetoothService
 import com.example.androidbljoy.data.ConnectionStatus
+import com.example.androidbljoy.data.model.DrivingMode
+import com.example.androidbljoy.data.model.InputsConfig
+import com.example.androidbljoy.data.model.MixerConfig
+import com.example.androidbljoy.data.model.OutputsConfig
+import com.example.androidbljoy.data.model.RcModelConfig
+import com.example.androidbljoy.data.repository.ModelRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,14 +18,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-enum class DrivingMode {
-    DUAL_DC,
-    TANK,
-    SERVO_CAR,
-    ARCADE
-}
-
-class MainScreenViewModel(val bluetoothService: BluetoothService) : ViewModel() {
+class MainScreenViewModel(
+    val bluetoothService: BluetoothService,
+    private val modelRepository: ModelRepository
+) : ViewModel() {
 
     // Connection and Scanner flows
     val connectionStatus: StateFlow<ConnectionStatus> = bluetoothService.connectionStatus
@@ -29,107 +31,40 @@ class MainScreenViewModel(val bluetoothService: BluetoothService) : ViewModel() 
     val isScanning: StateFlow<Boolean> = bluetoothService.isScanning
     val rssi: StateFlow<Int?> = bluetoothService.rssi
 
+    // Model Repository bindings
+    val activeModel: StateFlow<RcModelConfig> = modelRepository.activeModel
+    val allModels: StateFlow<List<RcModelConfig>> = modelRepository.models
 
-    // Mode Selector
-    private val _drivingMode = MutableStateFlow(DrivingMode.DUAL_DC)
-    val drivingMode: StateFlow<DrivingMode> = _drivingMode.asStateFlow()
+    // Banner notification for automatic model loading (Model Match)
+    private val _autoLoadNotification = MutableStateFlow<String?>(null)
+    val autoLoadNotification: StateFlow<String?> = _autoLoadNotification.asStateFlow()
 
-    // Mode 1 settings (Dual DC)
-    private val _invertTraction = MutableStateFlow(false)
-    val invertTraction: StateFlow<Boolean> = _invertTraction.asStateFlow()
-
-    private val _invertSteering = MutableStateFlow(false)
-    val invertSteering: StateFlow<Boolean> = _invertSteering.asStateFlow()
-
-    private val _swapAB = MutableStateFlow(false)
-    val swapAB: StateFlow<Boolean> = _swapAB.asStateFlow()
-
-    // Mode 2 settings (Tank)
-    private val _invertLeftTrack = MutableStateFlow(false)
-    val invertLeftTrack: StateFlow<Boolean> = _invertLeftTrack.asStateFlow()
-
-    private val _invertRightTrack = MutableStateFlow(false)
-    val invertRightTrack: StateFlow<Boolean> = _invertRightTrack.asStateFlow()
-
-    private val _swapTracks = MutableStateFlow(false)
-    val swapTracks: StateFlow<Boolean> = _swapTracks.asStateFlow()
-
-    // Mode 3 settings (Servo Car)
-    private val _servoMotorOutput = MutableStateFlow("A") // "A" or "B"
-    val servoMotorOutput: StateFlow<String> = _servoMotorOutput.asStateFlow()
-
-    private val _invertTractionServo = MutableStateFlow(false)
-    val invertTractionServo: StateFlow<Boolean> = _invertTractionServo.asStateFlow()
-
-    private val _invertServo = MutableStateFlow(false)
-    val invertServo: StateFlow<Boolean> = _invertServo.asStateFlow()
-
-    private val _trimSteering = MutableStateFlow(0) // -45 to +45
-    val trimSteering: StateFlow<Int> = _trimSteering.asStateFlow()
-
-    private val _epaSteering = MutableStateFlow(100) // 10% to 100%
-    val epaSteering: StateFlow<Int> = _epaSteering.asStateFlow()
-
-    // Universal Limits (EPA)
-    private val _tractionLimit = MutableStateFlow(255)
-    val tractionLimit: StateFlow<Int> = _tractionLimit.asStateFlow()
-
-    private val _steeringLimit = MutableStateFlow(255)
-    val steeringLimit: StateFlow<Int> = _steeringLimit.asStateFlow()
-
-    // Expo
-    private val _tractionExpo = MutableStateFlow(0) // 0 to 100%
-    val tractionExpo: StateFlow<Int> = _tractionExpo.asStateFlow()
-
-    private val _steeringExpo = MutableStateFlow(0) // 0 to 100%
-    val steeringExpo: StateFlow<Int> = _steeringExpo.asStateFlow()
-
-    // Deadband
-    private val _deadbandA = MutableStateFlow(0) // 0 to 127
-    val deadbandA: StateFlow<Int> = _deadbandA.asStateFlow()
-
-    private val _deadbandB = MutableStateFlow(0) // 0 to 127
-    val deadbandB: StateFlow<Int> = _deadbandB.asStateFlow()
-
-    private val _transmissionDelayMs = MutableStateFlow(20L)
-    val transmissionDelayMs: StateFlow<Long> = _transmissionDelayMs.asStateFlow()
-
-    // Live controller values (normalized -1.0f to 1.0f)
+    // Live raw stick inputs (-1.0f to 1.0f)
     val tractionValue = MutableStateFlow(0f)
     val steeringValue = MutableStateFlow(0f)
 
-    // Trim and Lock settings
-    private val _tractionTrim = MutableStateFlow(0) // -50 to 50
-    val tractionTrim: StateFlow<Int> = _tractionTrim.asStateFlow()
+    // Calculated outputs sent to hardware
+    val outputMotorA = MutableStateFlow(0)
+    val outputMotorB = MutableStateFlow(0)
+    val outputServo = MutableStateFlow(90)
 
+    // Trim locks for on-screen quick sliders
     private val _tractionTrimLocked = MutableStateFlow(false)
     val tractionTrimLocked: StateFlow<Boolean> = _tractionTrimLocked.asStateFlow()
-
-    private val _steeringTrim = MutableStateFlow(0) // -50 to 50
-    val steeringTrim: StateFlow<Int> = _steeringTrim.asStateFlow()
 
     private val _steeringTrimLocked = MutableStateFlow(false)
     val steeringTrimLocked: StateFlow<Boolean> = _steeringTrimLocked.asStateFlow()
 
-
-    // UI feedback flow for last sent message
-    private val _lastSentMessage = MutableStateFlow("A,0,B,0,S,90\\n")
+    // Telemetry feedback of last message
+    private val _lastSentMessage = MutableStateFlow("A,0,B,0,S,90,M,0\\n")
     val lastSentMessage: StateFlow<String> = _lastSentMessage.asStateFlow()
 
-    private val _swapJoysticks = MutableStateFlow(false)
-    val swapJoysticks: StateFlow<Boolean> = _swapJoysticks.asStateFlow()
-
-    private val _unifiedJoystick = MutableStateFlow(false)
-    val unifiedJoystick: StateFlow<Boolean> = _unifiedJoystick.asStateFlow()
-
-    private val _tractionHardwareMode = MutableStateFlow(0) // 0 = DC, 1 = ESC
-    val tractionHardwareMode: StateFlow<Int> = _tractionHardwareMode.asStateFlow()
-
     private var transmissionJob: Job? = null
+    private var connectionObserverJob: Job? = null
 
     init {
-        // Start transmission loop
         startTransmissionLoop()
+        observeConnectionForModelMatch()
     }
 
     private fun startTransmissionLoop() {
@@ -139,9 +74,36 @@ class MainScreenViewModel(val bluetoothService: BluetoothService) : ViewModel() 
                 if (connectionStatus.value == ConnectionStatus.CONNECTED) {
                     calculateAndSend()
                 }
-                delay(20L) // Global Keep-Alive loop interval (20ms for 50Hz refresh rate)
+                delay(20L) // 50Hz refresh rate
             }
         }
+    }
+
+    /**
+     * Watches for BLE connection events and applies Model Match auto-binding
+     */
+    private fun observeConnectionForModelMatch() {
+        connectionObserverJob?.cancel()
+        connectionObserverJob = viewModelScope.launch {
+            var previousStatus = connectionStatus.value
+            connectionStatus.collect { currentStatus ->
+                if (currentStatus == ConnectionStatus.CONNECTED && previousStatus != ConnectionStatus.CONNECTED) {
+                    val dev = connectedDevice.value
+                    if (dev != null) {
+                        val matched = modelRepository.findModelForBleDevice(dev.address)
+                        if (matched != null && matched.id != activeModel.value.id) {
+                            modelRepository.selectModel(matched.id)
+                            _autoLoadNotification.value = "Modelo '${matched.name}' cargado automáticamente"
+                        }
+                    }
+                }
+                previousStatus = currentStatus
+            }
+        }
+    }
+
+    fun clearAutoLoadNotification() {
+        _autoLoadNotification.value = null
     }
 
     private fun applyExpo(input: Float, expoPercent: Int): Float {
@@ -158,24 +120,38 @@ class MainScreenViewModel(val bluetoothService: BluetoothService) : ViewModel() 
     }
 
     private fun calculateAndSend() {
-        // 1. Appply Expo
-        val tExpo = applyExpo(tractionValue.value, _tractionExpo.value)
-        val sExpo = applyExpo(steeringValue.value, _steeringExpo.value)
+        val model = activeModel.value
+        val inputs = model.inputs
+        val mixer = model.mixer
+        val outputs = model.outputs
 
-        // 2. Apply EPA and Trim
-        val joyY = ((tExpo * _tractionLimit.value) + _tractionTrim.value).toInt().coerceIn(-_tractionLimit.value, _tractionLimit.value)
-        val joyX = ((sExpo * _steeringLimit.value) + _steeringTrim.value).toInt().coerceIn(-_steeringLimit.value, _steeringLimit.value)
+        // 1. Deadzone on Sticks
+        var rawT = tractionValue.value
+        if (kotlin.math.abs(rawT) < inputs.tractionDeadzone) rawT = 0f
+
+        var rawS = steeringValue.value
+        if (kotlin.math.abs(rawS) < inputs.steeringDeadzone) rawS = 0f
+
+        // 2. Apply Expo
+        val tExpo = applyExpo(rawT, inputs.tractionExpo)
+        val sExpo = applyExpo(rawS, inputs.steeringExpo)
+
+        // 3. Apply EPA and Trim
+        val joyY = ((tExpo * outputs.tractionLimit) + inputs.tractionTrim)
+            .toInt().coerceIn(-outputs.tractionLimit, outputs.tractionLimit)
+        val joyX = ((sExpo * outputs.steeringLimit) + inputs.steeringTrim)
+            .toInt().coerceIn(-outputs.steeringLimit, outputs.steeringLimit)
 
         var valA = 0
         var valB = 0
         var valS = 90
 
-        // 3. Mixing
-        when (_drivingMode.value) {
+        // 4. Mixing Stage
+        when (model.vehicleType) {
             DrivingMode.DUAL_DC -> {
-                val t = if (_invertTraction.value) -joyY else joyY
-                val s = if (_invertSteering.value) -joyX else joyX
-                if (_swapAB.value) {
+                val t = if (outputs.invertTraction) -joyY else joyY
+                val s = if (outputs.invertSteering) -joyX else joyX
+                if (mixer.swapAB) {
                     valA = s
                     valB = t
                 } else {
@@ -184,10 +160,11 @@ class MainScreenViewModel(val bluetoothService: BluetoothService) : ViewModel() 
                 }
                 valS = 90
             }
+
             DrivingMode.TANK -> {
-                val left = if (_invertLeftTrack.value) -joyY else joyY
-                val right = if (_invertRightTrack.value) -joyX else joyX
-                if (_swapTracks.value) {
+                val left = if (outputs.invertLeftTrack) -joyY else joyY
+                val right = if (outputs.invertRightTrack) -joyX else joyX
+                if (mixer.swapTracks) {
                     valA = right
                     valB = left
                 } else {
@@ -196,9 +173,10 @@ class MainScreenViewModel(val bluetoothService: BluetoothService) : ViewModel() 
                 }
                 valS = 90
             }
+
             DrivingMode.SERVO_CAR -> {
-                val t = if (_invertTractionServo.value) -joyY else joyY
-                if (_servoMotorOutput.value == "A") {
+                val t = if (outputs.invertTraction) -joyY else joyY
+                if (mixer.servoMotorOutput == "A") {
                     valA = t
                     valB = 0
                 } else {
@@ -206,21 +184,21 @@ class MainScreenViewModel(val bluetoothService: BluetoothService) : ViewModel() 
                     valB = t
                 }
 
-                // Servo steering handles EPA separately, but uses sExpo
-                val steerInput = if (_invertServo.value) -sExpo else sExpo
-                val baseAngle = 90 + _trimSteering.value
-                val maxDisplacement = 90f * (_epaSteering.value / 100f)
+                val steerInput = if (outputs.invertServo) -sExpo else sExpo
+                val baseAngle = 90 + outputs.trimSteering
+                val maxDisplacement = 90f * (outputs.epaSteering / 100f)
                 val finalAngle = baseAngle + (steerInput * maxDisplacement)
                 valS = finalAngle.toInt().coerceIn(0, 180)
             }
+
             DrivingMode.ARCADE -> {
-                val throttle = if (_invertTraction.value) -joyY else joyY
-                val steering = if (_invertSteering.value) -joyX else joyX
-                
+                val throttle = if (outputs.invertTraction) -joyY else joyY
+                val steering = if (outputs.invertSteering) -joyX else joyX
+
                 val left = throttle + steering
                 val right = throttle - steering
-                
-                if (_swapAB.value) {
+
+                if (mixer.swapAB) {
                     valA = right
                     valB = left
                 } else {
@@ -235,15 +213,18 @@ class MainScreenViewModel(val bluetoothService: BluetoothService) : ViewModel() 
         valA = valA.coerceIn(-255, 255)
         valB = valB.coerceIn(-255, 255)
 
-        // 4. Apply Deadband
-        val finalA = applyDeadband(valA, _deadbandA.value)
-        val finalB = applyDeadband(valB, _deadbandB.value)
+        // 5. Output Deadband
+        val finalA = applyDeadband(valA, outputs.deadbandA)
+        val finalB = applyDeadband(valB, outputs.deadbandB)
 
-        sendPayloadImmediate(finalA, finalB, valS)
+        outputMotorA.value = finalA
+        outputMotorB.value = finalB
+        outputServo.value = valS
+
+        sendPayloadImmediate(finalA, finalB, valS, outputs.tractionHardwareMode)
     }
 
-    private fun sendPayloadImmediate(a: Int, b: Int, s: Int) {
-        val m = _tractionHardwareMode.value
+    private fun sendPayloadImmediate(a: Int, b: Int, s: Int, m: Int) {
         val payload = "A,$a,B,$b,S,$s,M,$m\n"
         val success = bluetoothService.write(payload)
         if (success) {
@@ -251,85 +232,7 @@ class MainScreenViewModel(val bluetoothService: BluetoothService) : ViewModel() 
         }
     }
 
-    fun setDrivingMode(mode: DrivingMode) {
-        _drivingMode.value = mode
-        // Reset joystick inputs on mode change to prevent unexpected movements
-        tractionValue.value = 0f
-        steeringValue.value = 0f
-    }
-
-    // Setters for Mode 1
-    fun setInvertTraction(enabled: Boolean) {
-        _invertTraction.value = enabled
-    }
-
-    fun setInvertSteering(enabled: Boolean) {
-        _invertSteering.value = enabled
-    }
-
-    fun setSwapAB(enabled: Boolean) {
-        _swapAB.value = enabled
-    }
-
-    // Setters for Mode 2
-    fun setInvertLeftTrack(enabled: Boolean) {
-        _invertLeftTrack.value = enabled
-    }
-
-    fun setInvertRightTrack(enabled: Boolean) {
-        _invertRightTrack.value = enabled
-    }
-
-    fun setSwapTracks(enabled: Boolean) {
-        _swapTracks.value = enabled
-    }
-
-    // Setters for Mode 3
-    fun setServoMotorOutput(output: String) {
-        _servoMotorOutput.value = output
-    }
-
-    fun setInvertTractionServo(enabled: Boolean) {
-        _invertTractionServo.value = enabled
-    }
-
-    fun setInvertServo(enabled: Boolean) {
-        _invertServo.value = enabled
-    }
-
-    fun setTrimSteering(trim: Int) {
-        _trimSteering.value = trim.coerceIn(-45, 45)
-    }
-
-    fun setEpaSteering(epa: Int) {
-        _epaSteering.value = epa.coerceIn(10, 100)
-    }
-
-    // Universal limits
-    fun setTractionLimit(limit: Int) {
-        _tractionLimit.value = limit.coerceIn(0, 255)
-    }
-
-    fun setSteeringLimit(limit: Int) {
-        _steeringLimit.value = limit.coerceIn(0, 255)
-    }
-
-    fun setTractionExpo(expo: Int) {
-        _tractionExpo.value = expo.coerceIn(0, 100)
-    }
-
-    fun setSteeringExpo(expo: Int) {
-        _steeringExpo.value = expo.coerceIn(0, 100)
-    }
-
-    fun setDeadbandA(db: Int) {
-        _deadbandA.value = db.coerceIn(0, 127)
-    }
-
-    fun setDeadbandB(db: Int) {
-        _deadbandB.value = db.coerceIn(0, 127)
-    }
-
+    // --- LIVE CONTROLLER INPUTS ---
     fun updateTraction(value: Float) {
         tractionValue.value = value.coerceIn(-1f, 1f)
     }
@@ -338,10 +241,11 @@ class MainScreenViewModel(val bluetoothService: BluetoothService) : ViewModel() 
         steeringValue.value = value.coerceIn(-1f, 1f)
     }
 
-    // Trim and Lock settings
+    // --- QUICK TRIMS ---
     fun setTractionTrim(trim: Int) {
         if (!_tractionTrimLocked.value) {
-            _tractionTrim.value = trim.coerceIn(-50, 50)
+            val clamped = trim.coerceIn(-50, 50)
+            updateInputs { it.copy(tractionTrim = clamped) }
         }
     }
 
@@ -351,7 +255,8 @@ class MainScreenViewModel(val bluetoothService: BluetoothService) : ViewModel() 
 
     fun setSteeringTrim(trim: Int) {
         if (!_steeringTrimLocked.value) {
-            _steeringTrim.value = trim.coerceIn(-50, 50)
+            val clamped = trim.coerceIn(-50, 50)
+            updateInputs { it.copy(steeringTrim = clamped) }
         }
     }
 
@@ -359,24 +264,79 @@ class MainScreenViewModel(val bluetoothService: BluetoothService) : ViewModel() 
         _steeringTrimLocked.value = !_steeringTrimLocked.value
     }
 
-    fun toggleSwapJoysticks() {
-        _swapJoysticks.value = !_swapJoysticks.value
+    // --- MODEL CONFIGURATION SETTERS ---
+    fun updateInputs(transform: (InputsConfig) -> InputsConfig) {
+        modelRepository.updateActiveModel { current ->
+            current.copy(inputs = transform(current.inputs))
+        }
     }
 
-    fun toggleUnifiedJoystick() {
-        _unifiedJoystick.value = !_unifiedJoystick.value
+    fun updateMixer(transform: (MixerConfig) -> MixerConfig) {
+        modelRepository.updateActiveModel { current ->
+            current.copy(mixer = transform(current.mixer))
+        }
     }
 
-    fun setTractionHardwareMode(mode: Int) {
-        _tractionHardwareMode.value = mode
+    fun updateOutputs(transform: (OutputsConfig) -> OutputsConfig) {
+        modelRepository.updateActiveModel { current ->
+            current.copy(outputs = transform(current.outputs))
+        }
+    }
+
+    fun setVehicleType(mode: DrivingMode) {
+        modelRepository.updateActiveModel { current ->
+            current.copy(vehicleType = mode)
+        }
+        tractionValue.value = 0f
+        steeringValue.value = 0f
+    }
+
+    fun setModelName(name: String) {
+        modelRepository.updateActiveModel { current ->
+            current.copy(name = name)
+        }
+    }
+
+    // --- MODEL MANAGEMENT ---
+    fun selectModel(id: String) {
+        modelRepository.selectModel(id)
+        tractionValue.value = 0f
+        steeringValue.value = 0f
+    }
+
+    fun createNewModel(name: String, vehicleType: DrivingMode) {
+        modelRepository.createModel(name, vehicleType)
+    }
+
+    fun duplicateActiveModel() {
+        val dup = modelRepository.duplicateModel(activeModel.value.id)
+        if (dup != null) {
+            modelRepository.selectModel(dup.id)
+        }
+    }
+
+    fun deleteActiveModel() {
+        modelRepository.deleteModel(activeModel.value.id)
+    }
+
+    fun linkCurrentConnectedDevice() {
+        val dev = connectedDevice.value ?: return
+        modelRepository.linkDeviceToActiveModel(dev.address, dev.name)
+    }
+
+    fun unlinkDeviceFromActiveModel() {
+        modelRepository.unlinkDeviceFromActiveModel()
+    }
+
+    fun toggleAutoLoadOnConnect() {
+        modelRepository.updateActiveModel { current ->
+            current.copy(autoLoadOnConnect = !current.autoLoadOnConnect)
+        }
     }
 
     // --- GAMEPAD SUPPORT ---
     fun handleGamepadJoystick(leftX: Float, leftY: Float, rightX: Float, rightY: Float) {
         val deadzone = 0.15f
-
-        // X/Y axes are usually -1.0 to 1.0. For Y, -1.0 is UP, 1.0 is DOWN.
-        // We invert Y so UP is positive (1.0f) for traction.
         val processedLeftY = if (kotlin.math.abs(leftY) > deadzone) -leftY else 0f
         val processedLeftX = if (kotlin.math.abs(leftX) > deadzone) leftX else 0f
         val processedRightY = if (kotlin.math.abs(rightY) > deadzone) -rightY else 0f
@@ -387,21 +347,17 @@ class MainScreenViewModel(val bluetoothService: BluetoothService) : ViewModel() 
         val finalRightY = processedRightY.coerceIn(-1f, 1f)
         val finalRightX = processedRightX.coerceIn(-1f, 1f)
 
-        // Based on app mapping: Left Stick = Traction (Y), Right Stick = Steering (X)
-        if (_unifiedJoystick.value) {
-            // Unified mode enabled
-            if (_swapJoysticks.value) {
-                // Unified Right: Ignore Left Stick
+        val inputs = activeModel.value.inputs
+        if (inputs.unifiedJoystick) {
+            if (inputs.swapJoysticks) {
                 updateSteering(finalRightX)
                 updateTraction(finalRightY)
             } else {
-                // Unified Left: Ignore Right Stick
                 updateSteering(finalLeftX)
                 updateTraction(finalLeftY)
             }
         } else {
-            // Separated mode
-            if (_swapJoysticks.value) {
+            if (inputs.swapJoysticks) {
                 updateSteering(finalLeftX)
                 updateTraction(finalRightY)
             } else {
@@ -414,29 +370,26 @@ class MainScreenViewModel(val bluetoothService: BluetoothService) : ViewModel() 
     fun handleGamepadButtonDown(keyCode: Int) {
         when (keyCode) {
             android.view.KeyEvent.KEYCODE_BUTTON_R1 -> {
-                // Cycle Driving Mode Forward
-                val currentMode = _drivingMode.value
+                val currentMode = activeModel.value.vehicleType
                 val newMode = DrivingMode.values()[(currentMode.ordinal + 1) % DrivingMode.values().size]
-                setDrivingMode(newMode)
+                setVehicleType(newMode)
             }
             android.view.KeyEvent.KEYCODE_BUTTON_L1 -> {
-                // Cycle Driving Mode Backward
-                val currentMode = _drivingMode.value
+                val currentMode = activeModel.value.vehicleType
                 var newIndex = currentMode.ordinal - 1
                 if (newIndex < 0) newIndex = DrivingMode.values().size - 1
-                setDrivingMode(DrivingMode.values()[newIndex])
+                setVehicleType(DrivingMode.values()[newIndex])
             }
             android.view.KeyEvent.KEYCODE_BUTTON_Y,
-            android.view.KeyEvent.KEYCODE_BUTTON_X, // Fallback for Triangle/Y
-            100 -> { // Triangle
-                // Toggle Traction Hardware Mode
-                val current = _tractionHardwareMode.value
-                setTractionHardwareMode(if (current == 0) 1 else 0)
+            android.view.KeyEvent.KEYCODE_BUTTON_X,
+            100 -> {
+                val current = activeModel.value.outputs.tractionHardwareMode
+                updateOutputs { it.copy(tractionHardwareMode = if (current == 0) 1 else 0) }
             }
         }
     }
-    // -----------------------
 
+    // --- BLUETOOTH METHODS ---
     fun scanDevices() {
         bluetoothService.refreshPairedDevices()
         bluetoothService.startScanning()
@@ -457,6 +410,7 @@ class MainScreenViewModel(val bluetoothService: BluetoothService) : ViewModel() 
     override fun onCleared() {
         super.onCleared()
         transmissionJob?.cancel()
+        connectionObserverJob?.cancel()
         bluetoothService.stopScanning()
         bluetoothService.disconnect()
     }
