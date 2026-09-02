@@ -64,13 +64,13 @@ fun ExpoGraph(
                 strokeWidth = 1f
             )
 
-            // Draw Expo Curve: y = (1 - expo)*x + expo*x^3
+            // Draw Expo Curve
             val curvePath = Path()
             val steps = 40
             for (i in 0..steps) {
                 // x goes from -1.0 to +1.0
                 val normX = (i / steps.toFloat()) * 2f - 1f
-                val normY = (1f - expo) * normX + expo * (normX * normX * normX)
+                val normY = calculateExpo(normX, expoPercent)
 
                 // Map normX (-1..1) to screen px (0..w)
                 val px = midX + normX * (w / 2f)
@@ -86,13 +86,13 @@ fun ExpoGraph(
 
             drawPath(
                 path = curvePath,
-                color = CyberPrimary,
+                color = if (expoPercent < 0) com.example.androidbljoy.theme.NeonAmber else CyberPrimary,
                 style = Stroke(width = 2.dp.toPx())
             )
 
             // Draw current stick input dot on the curve
             val stickClamped = currentInput.coerceIn(-1f, 1f)
-            val stickOutput = (1f - expo) * stickClamped + expo * (stickClamped * stickClamped * stickClamped)
+            val stickOutput = calculateExpo(stickClamped, expoPercent)
             val dotX = midX + stickClamped * (w / 2f)
             val dotY = midY - stickOutput * (h / 2f)
 
@@ -102,5 +102,26 @@ fun ExpoGraph(
                 center = Offset(dotX, dotY)
             )
         }
+    }
+}
+
+/**
+ * Calculates exponential response curve for standard RC transmitters:
+ * - expoPercent > 0: Soft / dull center, aggressive at full deflection (precision maneuvers)
+ * - expoPercent == 0: Pure linear response
+ * - expoPercent < 0: Fast / hyper-reactive center, flattening at full deflection (aggressive maneuvers)
+ */
+fun calculateExpo(normX: Float, expoPercent: Int): Float {
+    val x = normX.coerceIn(-1f, 1f)
+    if (expoPercent == 0) return x
+    return if (expoPercent > 0) {
+        val e = expoPercent / 100f
+        (1f - e) * x + e * (x * x * x)
+    } else {
+        val k = -expoPercent / 100f
+        val absX = kotlin.math.abs(x)
+        val sign = if (x >= 0f) 1f else -1f
+        val convex = 1f - (1f - absX) * (1f - absX) * (1f - absX)
+        sign * ((1f - k) * absX + k * convex)
     }
 }

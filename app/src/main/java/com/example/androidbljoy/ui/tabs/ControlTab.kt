@@ -103,7 +103,13 @@ fun ControlTab(
                 Box(modifier = Modifier.weight(0.6f).fillMaxWidth())
             }
         } else {
-            val leftJoyLabel = if (drivingMode == DrivingMode.TANK) "Oruga Izq (Y)" else "Tracción (Y)"
+            val tractionIsVertical = activeModel.inputs.tractionAxisVertical
+            val leftJoyLabel = if (drivingMode == DrivingMode.TANK) {
+                if (tractionIsVertical) "Oruga Izq (Y)" else "Oruga Izq (X)"
+            } else {
+                if (tractionIsVertical) "Tracción (Y)" else "Tracción (X)"
+            }
+
             Column(
                 modifier = Modifier
                     .weight(1.1f)
@@ -117,37 +123,85 @@ fun ControlTab(
                 ) {
                     Joystick(
                         name = leftJoyLabel,
-                        isVerticalOnly = true,
-                        externalY = tractionVal,
-                        onValueChanged = { _, y -> viewModel.updateTraction(y) }
+                        isVerticalOnly = tractionIsVertical,
+                        isHorizontalOnly = !tractionIsVertical,
+                        externalX = if (!tractionIsVertical) tractionVal else null,
+                        externalY = if (tractionIsVertical) tractionVal else null,
+                        onValueChanged = { x, y ->
+                            if (tractionIsVertical) viewModel.updateTraction(y) else viewModel.updateTraction(x)
+                        }
                     )
 
-                    // Vertical Trim Slider & Lock
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.align(Alignment.CenterEnd).padding(end = 2.dp)
-                    ) {
-                        IconButton(
-                            onClick = { viewModel.toggleTractionTrimLock() },
-                            modifier = Modifier.size(24.dp)
+                    // Traction Trim Slider & Lock
+                    if (tractionIsVertical) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 2.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = "Lock Trim",
-                                tint = if (tractionTrimLocked) NeonRed else MutedText.copy(alpha = 0.5f),
-                                modifier = Modifier.size(16.dp)
+                            IconButton(
+                                onClick = { viewModel.toggleTractionTrimLock() },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = "Lock Trim",
+                                    tint = if (tractionTrimLocked) NeonRed else MutedText.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Text(
+                                text = "${if (tractionTrim > 0) "+" else ""}$tractionTrim",
+                                color = OffWhite,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
                             )
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.height(180.dp).width(30.dp)
+                            ) {
+                                Slider(
+                                    value = tractionTrim.toFloat(),
+                                    onValueChange = { viewModel.setTractionTrim(it.toInt()) },
+                                    valueRange = -50f..50f,
+                                    enabled = !tractionTrimLocked,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = if (!tractionTrimLocked) CyberPrimary else MutedText,
+                                        activeTrackColor = if (!tractionTrimLocked) CyberPrimary else MutedText.copy(alpha = 0.5f),
+                                        inactiveTrackColor = CyberSurfaceVariant
+                                    ),
+                                    modifier = Modifier
+                                        .requiredWidth(180.dp)
+                                        .graphicsLayer {
+                                            rotationZ = -90f
+                                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin.Center
+                                        }
+                                )
+                            }
                         }
-                        Text(
-                            text = "${if (tractionTrim > 0) "+" else ""}$tractionTrim",
-                            color = OffWhite,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier.height(180.dp).width(30.dp)
+                    } else {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.align(Alignment.BottomCenter)
                         ) {
+                            IconButton(
+                                onClick = { viewModel.toggleTractionTrimLock() },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = "Lock Trim",
+                                    tint = if (tractionTrimLocked) NeonRed else MutedText.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Text(
+                                text = "${if (tractionTrim > 0) "+" else ""}$tractionTrim",
+                                color = OffWhite,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.width(26.dp),
+                                textAlign = TextAlign.Center
+                            )
                             Slider(
                                 value = tractionTrim.toFloat(),
                                 onValueChange = { viewModel.setTractionTrim(it.toInt()) },
@@ -158,12 +212,7 @@ fun ControlTab(
                                     activeTrackColor = if (!tractionTrimLocked) CyberPrimary else MutedText.copy(alpha = 0.5f),
                                     inactiveTrackColor = CyberSurfaceVariant
                                 ),
-                                modifier = Modifier
-                                    .requiredWidth(180.dp)
-                                    .graphicsLayer {
-                                        rotationZ = -90f
-                                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin.Center
-                                    }
+                                modifier = Modifier.width(160.dp).height(20.dp)
                             )
                         }
                     }
@@ -171,7 +220,6 @@ fun ControlTab(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Quick Forward/Reverse Hold Buttons
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -180,13 +228,13 @@ fun ControlTab(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     PressHoldButton(
-                        text = "▲ Adelante",
+                        text = if (tractionIsVertical) "▲ Avanzar" else "Avanzar ▶",
                         modifier = Modifier.fillMaxWidth().weight(1f),
                         onPressed = { viewModel.updateTraction(1.0f) },
                         onReleased = { viewModel.updateTraction(0f) }
                     )
                     PressHoldButton(
-                        text = "▼ Reversa",
+                        text = if (tractionIsVertical) "▼ Retroceder" else "◀ Retroceder",
                         modifier = Modifier.fillMaxWidth().weight(1f),
                         onPressed = { viewModel.updateTraction(-1.0f) },
                         onReleased = { viewModel.updateTraction(0f) }
@@ -198,9 +246,36 @@ fun ControlTab(
 
     val rightColumnContent: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
         if (unifiedJoystick && drivingMode != DrivingMode.TANK) {
-            Spacer(modifier = Modifier.weight(1.1f).fillMaxHeight())
+            Column(
+                modifier = Modifier
+                    .weight(1.1f)
+                    .fillMaxHeight(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .background(CyberSurfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Modo Joystick Unificado Activo.\nControla todo desde el joystick principal.",
+                        color = MutedText,
+                        fontSize = 10.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
         } else {
-            val rightJoyLabel = if (drivingMode == DrivingMode.TANK) "Oruga Der (Y)" else "Dirección (X)"
+            val steeringIsHorizontal = if (drivingMode == DrivingMode.TANK) false else activeModel.inputs.steeringAxisHorizontal
+            val rightJoyLabel = if (drivingMode == DrivingMode.TANK) {
+                "Oruga Der (Y)"
+            } else {
+                if (steeringIsHorizontal) "Dirección (X)" else "Dirección (Y)"
+            }
+
             Column(
                 modifier = Modifier
                     .weight(1.1f)
@@ -214,22 +289,22 @@ fun ControlTab(
                 ) {
                     Joystick(
                         name = rightJoyLabel,
-                        isVerticalOnly = (drivingMode == DrivingMode.TANK),
-                        isHorizontalOnly = (drivingMode != DrivingMode.TANK),
+                        isVerticalOnly = !steeringIsHorizontal,
+                        isHorizontalOnly = steeringIsHorizontal,
                         isDigital = false,
-                        externalX = if (drivingMode != DrivingMode.TANK) steeringVal else null,
-                        externalY = if (drivingMode == DrivingMode.TANK) steeringVal else null,
+                        externalX = if (steeringIsHorizontal) steeringVal else null,
+                        externalY = if (!steeringIsHorizontal) steeringVal else null,
                         onValueChanged = { x, y ->
-                            if (drivingMode == DrivingMode.TANK) {
-                                viewModel.updateSteering(y)
-                            } else {
+                            if (steeringIsHorizontal) {
                                 viewModel.updateSteering(x)
+                            } else {
+                                viewModel.updateSteering(y)
                             }
                         }
                     )
 
-                    // Horizontal Steering Trim Slider (for Servo Car or Dual DC)
-                    if (drivingMode != DrivingMode.TANK) {
+                    // Steering Trim Slider (Horizontal or Vertical depending on chosen axis)
+                    if (steeringIsHorizontal) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.align(Alignment.BottomCenter)
@@ -265,6 +340,51 @@ fun ControlTab(
                                 ),
                                 modifier = Modifier.width(160.dp).height(20.dp)
                             )
+                        }
+                    } else {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 2.dp)
+                        ) {
+                            IconButton(
+                                onClick = { viewModel.toggleSteeringTrimLock() },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = "Lock Steering Trim",
+                                    tint = if (steeringTrimLocked) NeonRed else MutedText.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Text(
+                                text = "${if (steeringTrim > 0) "+" else ""}$steeringTrim",
+                                color = OffWhite,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.height(180.dp).width(30.dp)
+                            ) {
+                                Slider(
+                                    value = steeringTrim.toFloat(),
+                                    onValueChange = { viewModel.setSteeringTrim(it.toInt()) },
+                                    valueRange = -50f..50f,
+                                    enabled = !steeringTrimLocked,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = if (!steeringTrimLocked) CyberPrimary else MutedText,
+                                        activeTrackColor = if (!steeringTrimLocked) CyberPrimary else MutedText.copy(alpha = 0.5f),
+                                        inactiveTrackColor = CyberSurfaceVariant
+                                    ),
+                                    modifier = Modifier
+                                        .requiredWidth(180.dp)
+                                        .graphicsLayer {
+                                            rotationZ = -90f
+                                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin.Center
+                                        }
+                                )
+                            }
                         }
                     }
                 }

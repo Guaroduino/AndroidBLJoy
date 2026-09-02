@@ -1,7 +1,7 @@
 {
-  "versionCode": 15,
-  "versionName": "1.14",
+  "versionCode": 21,
+  "versionName": "1.20",
   "apkUrl": "https://storage.googleapis.com/androidblejoy.firebasestorage.app/updates/app-debug.apk",
-  "releaseNotes": "Refactorización completa a Transmisor RC estándar con 5 pestañas, telemetría PWM en tiempo real y Model Match BLE.",
+  "releaseNotes": "Curvature Drive (Cheesy Drive) con Quick-Turn en el Mixer Arcade, y End Points unificados en RangeSlider (-255 a +255) para configurar bandas continuas asimetricas y de solo avance.",
   "forceUpdate": false
 }

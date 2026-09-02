@@ -12,6 +12,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -174,6 +176,7 @@ fun MainScreen(
     val activeModel by viewModel.activeModel.collectAsStateWithLifecycle()
     val allModels by viewModel.allModels.collectAsStateWithLifecycle()
     val autoLoadNotification by viewModel.autoLoadNotification.collectAsStateWithLifecycle()
+    val isTestMode by viewModel.isTestMode.collectAsStateWithLifecycle()
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -184,11 +187,12 @@ fun MainScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(44.dp)
+                    .height(46.dp)
                     .background(CyberSurface.copy(alpha = 0.95f))
-                    .padding(horizontal = 8.dp),
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Left: Bluetooth Status Pill & Quick Connect
                 Row(
@@ -277,6 +281,31 @@ fun MainScreen(
                     }
                 }
 
+                // Test / Simulation Mode Toggle Pill
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (isTestMode) NeonGreen.copy(alpha = 0.2f) else CyberSurfaceVariant.copy(alpha = 0.6f))
+                        .border(1.5.dp, if (isTestMode) NeonGreen else MutedText.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                        .clickable { viewModel.toggleTestMode() }
+                        .padding(horizontal = 8.dp, vertical = 5.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "🧪 Modo Prueba: ",
+                            color = OffWhite,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (isTestMode) "ACTIVADO" else "DESACTIVADO",
+                            color = if (isTestMode) NeonGreen else NeonRed,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+
                 // Center: Model Quick-Picker Pill
                 Box(
                     modifier = Modifier
@@ -308,10 +337,29 @@ fun MainScreen(
                     }
                 }
 
-                // Right: 5 Tabs Navigation & Settings Icon
+                // Settings Icon (Dedicated easy touch button)
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(CyberSurfaceVariant)
+                        .border(1.dp, CyberPrimary.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        .clickable { showSettingsDialog = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Ajustes",
+                        tint = CyberPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                // Right: 5 Tabs Navigation
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.padding(end = 12.dp)
                 ) {
                     val tabs = listOf(
                         "🕹️ Control",
@@ -338,22 +386,6 @@ fun MainScreen(
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                    }
-
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    IconButton(
-                        onClick = { showSettingsDialog = true },
-                        modifier = Modifier
-                            .background(CyberSurfaceVariant, RoundedCornerShape(6.dp))
-                            .size(30.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = "Ajustes",
-                            tint = CyberPrimary,
-                            modifier = Modifier.size(16.dp)
-                        )
                     }
                 }
             }
@@ -915,8 +947,20 @@ fun MainScreen(
                                         }
                                         isDownloadingUpdate = false
                                         if (file != null) {
-                                            updateManager.installApk(file)
-                                            showUpdateDialog = false
+                                            val result = updateManager.installApk(file)
+                                            when (result) {
+                                                com.example.androidbljoy.data.InstallResult.SUCCESS -> {
+                                                    showUpdateDialog = false
+                                                }
+                                                com.example.androidbljoy.data.InstallResult.NEED_PERMISSION -> {
+                                                    updateCheckResultMsg = "Autoriza 'Instalar aplicaciones desconocidas' para continuar."
+                                                    showUpdateDialog = false
+                                                }
+                                                com.example.androidbljoy.data.InstallResult.ERROR -> {
+                                                    updateCheckResultMsg = "Error al iniciar instalación del APK."
+                                                    showUpdateDialog = false
+                                                }
+                                            }
                                         } else {
                                             updateCheckResultMsg = "Error al descargar actualización"
                                             showUpdateDialog = false

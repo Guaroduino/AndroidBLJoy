@@ -111,7 +111,31 @@ fun VehicleVisualizer(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 when (vehicleType) {
-                    DrivingMode.DUAL_DC, DrivingMode.ARCADE -> {
+                    DrivingMode.DUAL_DC -> {
+                        // Left Motor Bar (Traction)
+                        PwmVerticalBar(
+                            label = "TRACCIÓN (A)",
+                            value = motorA,
+                            modifier = Modifier.width(38.dp).fillMaxHeight()
+                        )
+
+                        // Central Car Graphic (Rear Wheels with PWM bars, Front Wheels with discrete turn)
+                        DualMotorChassisGraphic(
+                            motorA = motorA,
+                            motorB = motorB,
+                            isArcade = false,
+                            modifier = Modifier.weight(1f).fillMaxHeight()
+                        )
+
+                        // Right Directional Bar (Discrete Steering Left / Right)
+                        DirectionalMotorBar(
+                            label = "DIRECCIÓN (B)",
+                            value = motorB,
+                            modifier = Modifier.width(38.dp).fillMaxHeight()
+                        )
+                    }
+
+                    DrivingMode.ARCADE -> {
                         // Left Motor PWM Bar
                         PwmVerticalBar(
                             label = "MTR A (Izq)",
@@ -119,11 +143,10 @@ fun VehicleVisualizer(
                             modifier = Modifier.width(36.dp).fillMaxHeight()
                         )
 
-                        // Central Vehicle Chassis Graphic
                         DualMotorChassisGraphic(
                             motorA = motorA,
                             motorB = motorB,
-                            isArcade = (vehicleType == DrivingMode.ARCADE),
+                            isArcade = true,
                             modifier = Modifier.weight(1f).fillMaxHeight()
                         )
 
@@ -378,79 +401,301 @@ fun ServoAngleBar(
 }
 
 @Composable
+fun DirectionalMotorBar(
+    label: String,
+    value: Int,
+    modifier: Modifier = Modifier
+) {
+    val isLeft = value < -15
+    val isRight = value > 15
+    val isCenter = !isLeft && !isRight
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = label,
+            color = MutedText,
+            fontSize = 7.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            maxLines = 1
+        )
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        Box(
+            modifier = Modifier
+                .width(24.dp)
+                .weight(1f)
+                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+                .border(1.dp, CyberSurfaceVariant, RoundedCornerShape(4.dp))
+                .padding(2.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.SpaceBetween,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Left Turn Indicator
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(if (isLeft) NeonGreen else CyberSurfaceVariant.copy(alpha = 0.25f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("◄", color = if (isLeft) Color.Black else MutedText, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                }
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                // Center Indicator
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.8f)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(if (isCenter) CyberPrimary.copy(alpha = 0.5f) else CyberSurfaceVariant.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("●", color = if (isCenter) CyberPrimary else MutedText.copy(alpha = 0.5f), fontSize = 7.sp)
+                }
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                // Right Turn Indicator
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(if (isRight) NeonGreen else CyberSurfaceVariant.copy(alpha = 0.25f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("►", color = if (isRight) Color.Black else MutedText, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(2.dp))
+
+        Text(
+            text = when {
+                isLeft -> "◄ IZQ"
+                isRight -> "DER ►"
+                else -> "RECTO"
+            },
+            color = if (!isCenter) NeonGreen else MutedText,
+            fontSize = 8.sp,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
 fun DualMotorChassisGraphic(
     motorA: Int,
     motorB: Int,
     isArcade: Boolean,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier.padding(horizontal = 8.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(modifier = Modifier.size(width = 120.dp, height = 110.dp)) {
-            val w = size.width
-            val h = size.height
-            val centerX = w / 2f
-            val centerY = h / 2f
+    if (isArcade) {
+        // Arcade Differential Chassis
+        Box(
+            modifier = modifier.padding(horizontal = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.size(width = 120.dp, height = 110.dp)) {
+                val centerX = size.width / 2f
+                val centerY = size.height / 2f
 
-            // Central Rover Chassis Body
-            drawRoundRect(
-                color = CyberSurfaceVariant.copy(alpha = 0.7f),
-                topLeft = Offset(centerX - 24.dp.toPx(), centerY - 38.dp.toPx()),
-                size = Size(48.dp.toPx(), 76.dp.toPx()),
-                cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx())
-            )
-            drawRoundRect(
-                color = CyberPrimary.copy(alpha = 0.6f),
-                topLeft = Offset(centerX - 24.dp.toPx(), centerY - 38.dp.toPx()),
-                size = Size(48.dp.toPx(), 76.dp.toPx()),
-                cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx()),
-                style = Stroke(width = 1.5.dp.toPx())
-            )
+                // Central Rover Chassis Body
+                drawRoundRect(
+                    color = CyberSurfaceVariant.copy(alpha = 0.7f),
+                    topLeft = Offset(centerX - 24.dp.toPx(), centerY - 38.dp.toPx()),
+                    size = Size(48.dp.toPx(), 76.dp.toPx()),
+                    cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx())
+                )
+                drawRoundRect(
+                    color = CyberPrimary.copy(alpha = 0.6f),
+                    topLeft = Offset(centerX - 24.dp.toPx(), centerY - 38.dp.toPx()),
+                    size = Size(48.dp.toPx(), 76.dp.toPx()),
+                    cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx()),
+                    style = Stroke(width = 1.5.dp.toPx())
+                )
 
-            // Front direction indicator arrow (Forward ▲)
-            val arrowPath = Path().apply {
-                moveTo(centerX, centerY - 28.dp.toPx())
-                lineTo(centerX - 8.dp.toPx(), centerY - 16.dp.toPx())
-                lineTo(centerX + 8.dp.toPx(), centerY - 16.dp.toPx())
-                close()
+                // Front direction indicator arrow
+                val arrowPath = Path().apply {
+                    moveTo(centerX, centerY - 28.dp.toPx())
+                    lineTo(centerX - 8.dp.toPx(), centerY - 16.dp.toPx())
+                    lineTo(centerX + 8.dp.toPx(), centerY - 16.dp.toPx())
+                    close()
+                }
+                drawPath(arrowPath, color = CyberPrimary)
+
+                // Left Wheels (Motor A)
+                val leftColor = if (motorA > 0) NeonGreen else if (motorA < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
+                drawRoundRect(color = leftColor, topLeft = Offset(centerX - 38.dp.toPx(), centerY - 34.dp.toPx()), size = Size(10.dp.toPx(), 22.dp.toPx()), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()))
+                drawRoundRect(color = leftColor, topLeft = Offset(centerX - 38.dp.toPx(), centerY + 12.dp.toPx()), size = Size(10.dp.toPx(), 22.dp.toPx()), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()))
+
+                // Right Wheels (Motor B)
+                val rightColor = if (motorB > 0) NeonGreen else if (motorB < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
+                drawRoundRect(color = rightColor, topLeft = Offset(centerX + 28.dp.toPx(), centerY - 34.dp.toPx()), size = Size(10.dp.toPx(), 22.dp.toPx()), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()))
+                drawRoundRect(color = rightColor, topLeft = Offset(centerX + 28.dp.toPx(), centerY + 12.dp.toPx()), size = Size(10.dp.toPx(), 22.dp.toPx()), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()))
             }
-            drawPath(arrowPath, color = CyberPrimary)
+        }
+    } else {
+        // Dual DC Car: Rear wheels have PWM power bars, Front wheels have discrete left/right turn
+        val isTurnLeft = motorB < -15
+        val isTurnRight = motorB > 15
+        val discreteAngle = when {
+            isTurnLeft -> -28f
+            isTurnRight -> 28f
+            else -> 0f
+        }
+        val animatedAngle by animateFloatAsState(targetValue = discreteAngle, animationSpec = tween(70), label = "dcSteer")
 
-            // Left Wheels (Motor A)
-            val leftColor = if (motorA > 0) NeonGreen else if (motorA < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
-            // Front Left
-            drawRoundRect(
-                color = leftColor,
-                topLeft = Offset(centerX - 38.dp.toPx(), centerY - 34.dp.toPx()),
-                size = Size(10.dp.toPx(), 22.dp.toPx()),
-                cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx())
-            )
-            // Rear Left
-            drawRoundRect(
-                color = leftColor,
-                topLeft = Offset(centerX - 38.dp.toPx(), centerY + 12.dp.toPx()),
-                size = Size(10.dp.toPx(), 22.dp.toPx()),
-                cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx())
-            )
+        val tractionColor = if (motorA > 0) NeonGreen else if (motorA < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
+        val tractionRatio = (abs(motorA).coerceIn(0, 255) / 255f)
 
-            // Right Wheels (Motor B)
-            val rightColor = if (motorB > 0) NeonGreen else if (motorB < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
-            // Front Right
-            drawRoundRect(
-                color = rightColor,
-                topLeft = Offset(centerX + 28.dp.toPx(), centerY - 34.dp.toPx()),
-                size = Size(10.dp.toPx(), 22.dp.toPx()),
-                cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx())
-            )
-            // Rear Right
-            drawRoundRect(
-                color = rightColor,
-                topLeft = Offset(centerX + 28.dp.toPx(), centerY + 12.dp.toPx()),
-                size = Size(10.dp.toPx(), 22.dp.toPx()),
-                cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx())
-            )
+        Box(
+            modifier = modifier.padding(horizontal = 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier.size(width = 130.dp, height = 115.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                // Static Hull & Rear Wheels with Live Bars
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val centerX = size.width / 2f
+                    val centerY = size.height / 2f
+
+                    // Car Chassis Body
+                    drawRoundRect(
+                        color = CyberSurfaceVariant.copy(alpha = 0.8f),
+                        topLeft = Offset(centerX - 20.dp.toPx(), centerY - 38.dp.toPx()),
+                        size = Size(40.dp.toPx(), 74.dp.toPx()),
+                        cornerRadius = CornerRadius(8.dp.toPx(), 8.dp.toPx())
+                    )
+                    drawRoundRect(
+                        color = CyberPrimary.copy(alpha = 0.6f),
+                        topLeft = Offset(centerX - 20.dp.toPx(), centerY - 38.dp.toPx()),
+                        size = Size(40.dp.toPx(), 74.dp.toPx()),
+                        cornerRadius = CornerRadius(8.dp.toPx(), 8.dp.toPx()),
+                        style = Stroke(width = 1.5.dp.toPx())
+                    )
+
+                    // Axles
+                    drawLine(
+                        color = CyberPrimary.copy(alpha = 0.6f),
+                        start = Offset(centerX - 30.dp.toPx(), centerY - 24.dp.toPx()),
+                        end = Offset(centerX + 30.dp.toPx(), centerY - 24.dp.toPx()),
+                        strokeWidth = 2.dp.toPx()
+                    )
+                    drawLine(
+                        color = CyberPrimary.copy(alpha = 0.6f),
+                        start = Offset(centerX - 32.dp.toPx(), centerY + 24.dp.toPx()),
+                        end = Offset(centerX + 32.dp.toPx(), centerY + 24.dp.toPx()),
+                        strokeWidth = 2.dp.toPx()
+                    )
+
+                    // REAR WHEELS WITH PWM LEVEL BARS
+                    val rearWheelW = 10.dp.toPx()
+                    val rearWheelH = 26.dp.toPx()
+                    val leftRearX = centerX - 36.dp.toPx()
+                    val rightRearX = centerX + 26.dp.toPx()
+                    val rearY = centerY + 11.dp.toPx()
+
+                    // Left Rear Wheel Frame & Bar
+                    drawRoundRect(color = Color.Black.copy(alpha = 0.85f), topLeft = Offset(leftRearX, rearY), size = Size(rearWheelW, rearWheelH), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()))
+                    drawRoundRect(color = CyberPrimary.copy(alpha = 0.5f), topLeft = Offset(leftRearX, rearY), size = Size(rearWheelW, rearWheelH), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()), style = Stroke(width = 1.dp.toPx()))
+                    if (tractionRatio > 0f) {
+                        val barH = rearWheelH * tractionRatio
+                        val barTop = if (motorA > 0) rearY + (rearWheelH - barH) else rearY
+                        drawRoundRect(color = tractionColor, topLeft = Offset(leftRearX, barTop), size = Size(rearWheelW, barH), cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()))
+                    }
+
+                    // Right Rear Wheel Frame & Bar
+                    drawRoundRect(color = Color.Black.copy(alpha = 0.85f), topLeft = Offset(rightRearX, rearY), size = Size(rearWheelW, rearWheelH), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()))
+                    drawRoundRect(color = CyberPrimary.copy(alpha = 0.5f), topLeft = Offset(rightRearX, rearY), size = Size(rearWheelW, rearWheelH), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()), style = Stroke(width = 1.dp.toPx()))
+                    if (tractionRatio > 0f) {
+                        val barH = rearWheelH * tractionRatio
+                        val barTop = if (motorA > 0) rearY + (rearWheelH - barH) else rearY
+                        drawRoundRect(color = tractionColor, topLeft = Offset(rightRearX, barTop), size = Size(rearWheelW, barH), cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()))
+                    }
+                }
+
+                // FRONT WHEELS (Rotating Discretely Left or Right - NOT proportional)
+                val frontSteerColor = if (isTurnLeft || isTurnRight) NeonGreen else OffWhite.copy(alpha = 0.4f)
+
+                // Front Left Wheel
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 28.dp, top = 20.dp)
+                        .graphicsLayer {
+                            rotationZ = animatedAngle
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin.Center
+                        }
+                        .size(width = 10.dp, height = 24.dp)
+                        .background(frontSteerColor, RoundedCornerShape(3.dp))
+                        .border(1.dp, Color.Black.copy(alpha = 0.5f), RoundedCornerShape(3.dp))
+                )
+
+                // Front Right Wheel
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(end = 28.dp, top = 20.dp)
+                        .graphicsLayer {
+                            rotationZ = animatedAngle
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin.Center
+                        }
+                        .size(width = 10.dp, height = 24.dp)
+                        .background(frontSteerColor, RoundedCornerShape(3.dp))
+                        .border(1.dp, Color.Black.copy(alpha = 0.5f), RoundedCornerShape(3.dp))
+                )
+
+                // Directional Turn Text Indicator
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 3.dp)
+                ) {
+                    Text(
+                        text = when {
+                            isTurnLeft -> "◄◄ GIRO IZQ"
+                            isTurnRight -> "GIRO DER ►►"
+                            else -> "▲ RECTO ▲"
+                        },
+                        color = if (isTurnLeft || isTurnRight) NeonGreen else MutedText,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+
+                // Rear Wheels Label
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 2.dp)
+                ) {
+                    Text(
+                        text = "RUEDAS TRASERAS PWM",
+                        color = MutedText,
+                        fontSize = 7.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     }
 }

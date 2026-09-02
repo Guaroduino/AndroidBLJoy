@@ -1,7 +1,10 @@
 package com.example.androidbljoy.ui.tabs
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Slider
@@ -29,6 +34,7 @@ import com.example.androidbljoy.theme.CyberPrimary
 import com.example.androidbljoy.theme.CyberSurface
 import com.example.androidbljoy.theme.CyberSurfaceVariant
 import com.example.androidbljoy.theme.MutedText
+import com.example.androidbljoy.theme.NeonAmber
 import com.example.androidbljoy.theme.OffWhite
 import com.example.androidbljoy.ui.components.CustomSwitch
 import com.example.androidbljoy.ui.components.ExpoGraph
@@ -70,7 +76,7 @@ fun InputsTab(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Suaviza la respuesta alrededor del centro del stick sin reducir la velocidad máxima.",
+                        text = "Valores positivos (+): centro suave para maniobras de precisión. Valores negativos (-): respuesta agresiva y reactiva al menor toque.",
                         color = MutedText,
                         fontSize = 10.sp
                     )
@@ -94,15 +100,20 @@ fun InputsTab(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text("Expo Tracción", color = OffWhite, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                        Text("${inputs.tractionExpo}%", color = CyberPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            text = "${if (inputs.tractionExpo > 0) "+" else ""}${inputs.tractionExpo}%",
+                                            color = if (inputs.tractionExpo > 0) CyberPrimary else if (inputs.tractionExpo < 0) NeonAmber else OffWhite,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     }
                                     Slider(
                                         value = inputs.tractionExpo.toFloat(),
                                         onValueChange = { viewModel.updateInputs { inp -> inp.copy(tractionExpo = it.toInt()) } },
-                                        valueRange = 0f..100f,
+                                        valueRange = -100f..100f,
                                         colors = SliderDefaults.colors(
-                                            thumbColor = CyberPrimary,
-                                            activeTrackColor = CyberPrimary,
+                                            thumbColor = if (inputs.tractionExpo < 0) NeonAmber else CyberPrimary,
+                                            activeTrackColor = if (inputs.tractionExpo < 0) NeonAmber else CyberPrimary,
                                             inactiveTrackColor = CyberSurfaceVariant
                                         ),
                                         modifier = Modifier.height(24.dp)
@@ -132,15 +143,20 @@ fun InputsTab(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text("Expo Dirección", color = OffWhite, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                        Text("${inputs.steeringExpo}%", color = CyberPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text(
+                                            text = "${if (inputs.steeringExpo > 0) "+" else ""}${inputs.steeringExpo}%",
+                                            color = if (inputs.steeringExpo > 0) CyberPrimary else if (inputs.steeringExpo < 0) NeonAmber else OffWhite,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     }
                                     Slider(
                                         value = inputs.steeringExpo.toFloat(),
                                         onValueChange = { viewModel.updateInputs { inp -> inp.copy(steeringExpo = it.toInt()) } },
-                                        valueRange = 0f..100f,
+                                        valueRange = -100f..100f,
                                         colors = SliderDefaults.colors(
-                                            thumbColor = CyberPrimary,
-                                            activeTrackColor = CyberPrimary,
+                                            thumbColor = if (inputs.steeringExpo < 0) NeonAmber else CyberPrimary,
+                                            activeTrackColor = if (inputs.steeringExpo < 0) NeonAmber else CyberPrimary,
                                             inactiveTrackColor = CyberSurfaceVariant
                                         ),
                                         modifier = Modifier.height(24.dp)
@@ -178,7 +194,7 @@ fun InputsTab(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Evita derivas involuntarias causadas por el temblor de los dedos o descalibración del centro.",
+                        text = "Elimina derivas en reposo. El recorrido se reescala suavemente desde 0% justo al salir de la zona muerta, sin saltos bruscos de aceleración.",
                         color = MutedText,
                         fontSize = 10.sp
                     )
@@ -267,6 +283,68 @@ fun InputsTab(
                             checked = inputs.unifiedJoystick,
                             onCheckedChange = { viewModel.updateInputs { inp -> inp.copy(unifiedJoystick = it) } }
                         )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Eje de Tracción / Acelerador", color = OffWhite, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Controla con movimiento vertical (arriba/abajo) u horizontal", color = MutedText, fontSize = 9.sp)
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (inputs.tractionAxisVertical) CyberPrimary else CyberSurfaceVariant)
+                                    .clickable { viewModel.updateInputs { inp -> inp.copy(tractionAxisVertical = true) } }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("↕ Vertical (Y)", color = if (inputs.tractionAxisVertical) Color.Black else OffWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (!inputs.tractionAxisVertical) CyberPrimary else CyberSurfaceVariant)
+                                    .clickable { viewModel.updateInputs { inp -> inp.copy(tractionAxisVertical = false) } }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("↔ Horizontal (X)", color = if (!inputs.tractionAxisVertical) Color.Black else OffWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Eje de Dirección / Giro", color = OffWhite, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Gira con movimiento horizontal (izq/der) o vertical", color = MutedText, fontSize = 9.sp)
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (inputs.steeringAxisHorizontal) CyberPrimary else CyberSurfaceVariant)
+                                    .clickable { viewModel.updateInputs { inp -> inp.copy(steeringAxisHorizontal = true) } }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("↔ Horizontal (X)", color = if (inputs.steeringAxisHorizontal) Color.Black else OffWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (!inputs.steeringAxisHorizontal) CyberPrimary else CyberSurfaceVariant)
+                                    .clickable { viewModel.updateInputs { inp -> inp.copy(steeringAxisHorizontal = false) } }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("↕ Vertical (Y)", color = if (!inputs.steeringAxisHorizontal) Color.Black else OffWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
 
                     Row(

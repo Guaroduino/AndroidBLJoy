@@ -11,6 +11,7 @@ import com.example.androidbljoy.data.model.MixerConfig
 import com.example.androidbljoy.data.model.OutputsConfig
 import com.example.androidbljoy.data.model.RcModelConfig
 import com.example.androidbljoy.data.repository.ModelRepository
+import com.example.androidbljoy.ui.components.calculateExpo
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,8 +56,16 @@ class MainScreenViewModel(
     private val _steeringTrimLocked = MutableStateFlow(false)
     val steeringTrimLocked: StateFlow<Boolean> = _steeringTrimLocked.asStateFlow()
 
+    // Test / Simulation Mode (allows testing joysticks, mixers, visualizer without BLE robot)
+    private val _isTestMode = MutableStateFlow(false)
+    val isTestMode: StateFlow<Boolean> = _isTestMode.asStateFlow()
+
+    fun toggleTestMode() {
+        _isTestMode.value = !_isTestMode.value
+    }
+
     // Telemetry feedback of last message
-    private val _lastSentMessage = MutableStateFlow("A,0,B,0,S,90,M,0\\n")
+    private val _lastSentMessage = MutableStateFlow("SIM: A,0,B,0,S,90,M,0\\n")
     val lastSentMessage: StateFlow<String> = _lastSentMessage.asStateFlow()
 
     private var transmissionJob: Job? = null
@@ -71,9 +80,8 @@ class MainScreenViewModel(
         transmissionJob?.cancel()
         transmissionJob = viewModelScope.launch {
             while (true) {
-                if (connectionStatus.value == ConnectionStatus.CONNECTED) {
-                    calculateAndSend()
-                }
+                // Real-time calculation loop runs continuously for instant UI visualizer and telemetry updates
+                calculateAndSend()
                 delay(20L) // 50Hz refresh rate
             }
         }
@@ -106,9 +114,44 @@ class MainScreenViewModel(
         _autoLoadNotification.value = null
     }
 
-    private fun applyExpo(input: Float, expoPercent: Int): Float {
-        val expo = expoPercent / 100f
-        return (1f - expo) * input + expo * (input * input * input)
+    private fun applyStickDeadzone(input: Float, deadzone: Float): Float {
+        val absVal = kotlin.math.abs(input)
+        if (absVal <= deadzone) return 0f
+        val sign = if (input > 0f) 1f else -1f
+        val denominator = (1f - deadzone).coerceAtLeast(0.001f)
+        return (sign * ((absVal - deadzone) / denominator)).coerceIn(-1f, 1f)
+    }
+
+    companion object {
+        fun mapDemandToEpa(demand: Float, minEpa: Int, maxEpa: Int): Int {
+            if (demand == 0f) return 0
+
+            return if (minEpa < 0 && maxEpa > 0) {
+                // Bidirectional with asymmetric limits (e.g. -100 to +180 or -255 to +255)
+                if (demand > 0f) {
+                    (demand * maxEpa).toInt()
+                } else {
+                    (kotlin.math.abs(demand) * minEpa).toInt()
+                }
+            } else if (minEpa >= 0 && maxEpa >= 0) {
+                // Strictly positive band (e.g. 20 to 240) -> excludes negatives
+                if (demand > 0f) {
+                    (minEpa + demand * (maxEpa - minEpa)).toInt()
+                } else {
+                    0
+                }
+            } else if (minEpa <= 0 && maxEpa <= 0) {
+                // Strictly negative band (e.g. -240 to -20) -> excludes positives
+                if (demand < 0f) {
+                    val absD = kotlin.math.abs(demand)
+                    (maxEpa - absD * (maxEpa - minEpa)).toInt()
+                } else {
+                    0
+                }
+            } else {
+                0
+            }
+        }
     }
 
     private fun applyDeadband(motorValue: Int, deadband: Int): Int {
@@ -123,112 +166,159 @@ class MainScreenViewModel(
         val model = activeModel.value
         val inputs = model.inputs
         val mixer = model.mixer
-        val outputs = model.outputs
+        val outputs = model.outputs.normalized()
 
-        // 1. Deadzone on Sticks
-        var rawT = tractionValue.value
-        if (kotlin.math.abs(rawT) < inputs.tractionDeadzone) rawT = 0f
+        // 1. Rescaled Deadzone on Sticks (Starts smoothly from minimum 0% right after threshold)
+        val rawT = applyStickDeadzone(tractionValue.value, inputs.tractionDeadzone)
+        val rawS = applyStickDeadzone(steeringValue.value, inputs.steeringDeadzone)
 
-        var rawS = steeringValue.value
-        if (kotlin.math.abs(rawS) < inputs.steeringDeadzone) rawS = 0f
+        // 2. Apply Expo (Supports negative and positive exponential curves)
+        val tExpo = calculateExpo(rawT, inputs.tractionExpo)
+        val sExpo = calculateExpo(rawS, inputs.steeringExpo)
 
-        // 2. Apply Expo
-        val tExpo = applyExpo(rawT, inputs.tractionExpo)
-        val sExpo = applyExpo(rawS, inputs.steeringExpo)
+        // Screen Quick Trims (-0.2f .. +0.2f normalized)
+        val trimT = (inputs.tractionTrim / 50f) * 0.2f
+        val trimS = (inputs.steeringTrim / 50f) * 0.2f
 
-        // 3. Apply EPA and Trim
-        val joyY = ((tExpo * outputs.tractionLimit) + inputs.tractionTrim)
-            .toInt().coerceIn(-outputs.tractionLimit, outputs.tractionLimit)
-        val joyX = ((sExpo * outputs.steeringLimit) + inputs.steeringTrim)
-            .toInt().coerceIn(-outputs.steeringLimit, outputs.steeringLimit)
+        val inT = (tExpo + trimT).coerceIn(-1f, 1f)
+        val inS = (sExpo + trimS).coerceIn(-1f, 1f)
 
-        var valA = 0
-        var valB = 0
-        var valS = 90
+        var motorA_demand = 0f
+        var motorB_demand = 0f
+        var servo_deg = 90
 
-        // 4. Mixing Stage
+        // 3. MIXING STAGE (Translates inputs into actuator demands in -1.0 .. 1.0)
         when (model.vehicleType) {
-            DrivingMode.DUAL_DC -> {
-                val t = if (outputs.invertTraction) -joyY else joyY
-                val s = if (outputs.invertSteering) -joyX else joyX
-                if (mixer.swapAB) {
-                    valA = s
-                    valB = t
+            DrivingMode.ARCADE -> {
+                val weightT = (mixer.arcadeThrottleWeight.coerceIn(0, 100)) / 100f
+                val weightS = (mixer.arcadeSteeringWeight.coerceIn(0, 100)) / 100f
+
+                var left = 0f
+                var right = 0f
+
+                if (mixer.arcadeMixMode == 1) {
+                    // CURVATURA CONSTANTE (Cheesy Drive)
+                    val forward = inT * weightT
+                    val turnRate = inS * weightS
+
+                    if (kotlin.math.abs(forward) <= 0.08f) {
+                        // Quick-Turn: Giro en el sitio cuando está detenido
+                        left = turnRate
+                        right = -turnRate
+                    } else {
+                        // Curvatura proporcional en movimiento
+                        val turn = kotlin.math.abs(forward) * turnRate
+                        left = forward + turn
+                        right = forward - turn
+
+                        // Preservar la curvatura exacta sin saturación
+                        val maxMag = maxOf(kotlin.math.abs(left), kotlin.math.abs(right))
+                        if (maxMag > 1.0f) {
+                            left /= maxMag
+                            right /= maxMag
+                        }
+                    }
                 } else {
-                    valA = t
-                    valB = s
+                    // LINEAL CLÁSICO (Suma y resta diferencial)
+                    val throttle = inT * weightT
+                    val steering = inS * weightS
+
+                    left = (throttle + steering).coerceIn(-1f, 1f)
+                    right = (throttle - steering).coerceIn(-1f, 1f)
                 }
-                valS = 90
+
+                if (mixer.swapAB) {
+                    val tmp = left
+                    left = right
+                    right = tmp
+                }
+
+                motorA_demand = left
+                motorB_demand = right
+                servo_deg = 90
             }
 
             DrivingMode.TANK -> {
-                val left = if (outputs.invertLeftTrack) -joyY else joyY
-                val right = if (outputs.invertRightTrack) -joyX else joyX
+                // Independent dual stick tank: inT = Left Track, inS = Right Track
                 if (mixer.swapTracks) {
-                    valA = right
-                    valB = left
+                    motorA_demand = inS
+                    motorB_demand = inT
                 } else {
-                    valA = left
-                    valB = right
+                    motorA_demand = inT
+                    motorB_demand = inS
                 }
-                valS = 90
+                servo_deg = 90
+            }
+
+            DrivingMode.DUAL_DC -> {
+                // Motor A = Traction, Motor B = Steering DC Motor
+                var t = inT
+                var s = inS
+                if (mixer.swapAB) {
+                    val tmp = t
+                    t = s
+                    s = tmp
+                }
+                motorA_demand = t
+                motorB_demand = s
+                servo_deg = 90
             }
 
             DrivingMode.SERVO_CAR -> {
-                val t = if (outputs.invertTraction) -joyY else joyY
-                if (mixer.servoMotorOutput == "A") {
-                    valA = t
-                    valB = 0
+                if (mixer.servoMotorOutput == "B") {
+                    motorA_demand = 0f
+                    motorB_demand = inT
                 } else {
-                    valA = 0
-                    valB = t
+                    motorA_demand = inT
+                    motorB_demand = 0f
                 }
 
-                val steerInput = if (outputs.invertServo) -sExpo else sExpo
+                val steerInput = if (outputs.invertServo) -inS else inS
                 val baseAngle = 90 + outputs.trimSteering
-                val maxDisplacement = 90f * (outputs.epaSteering / 100f)
-                val finalAngle = baseAngle + (steerInput * maxDisplacement)
-                valS = finalAngle.toInt().coerceIn(0, 180)
-            }
-
-            DrivingMode.ARCADE -> {
-                val throttle = if (outputs.invertTraction) -joyY else joyY
-                val steering = if (outputs.invertSteering) -joyX else joyX
-
-                val left = throttle + steering
-                val right = throttle - steering
-
-                if (mixer.swapAB) {
-                    valA = right
-                    valB = left
+                val finalAngle = if (steerInput >= 0f) {
+                    val maxRight = 90f * (outputs.epaServoRight / 100f)
+                    baseAngle + (steerInput * maxRight)
                 } else {
-                    valA = left
-                    valB = right
+                    val maxLeft = 90f * (outputs.epaServoLeft / 100f)
+                    baseAngle + (steerInput * maxLeft)
                 }
-                valS = 90
+                servo_deg = finalAngle.toInt().coerceIn(0, 180)
             }
         }
 
-        // Clamp pre-deadband outputs
-        valA = valA.coerceIn(-255, 255)
-        valB = valB.coerceIn(-255, 255)
+        // 4. OUTPUTS STAGE (Physical Inversion, Band RangeSlider End Points, Deadband on Motor A & Motor B)
+        // MOTOR A:
+        val dirA = if (outputs.invertMotorA) -motorA_demand else motorA_demand
+        val epaA = mapDemandToEpa(dirA, outputs.minEpaMotorA, outputs.maxEpaMotorA)
+        val finalA = applyDeadband(epaA.coerceIn(-255, 255), outputs.deadbandA)
 
-        // 5. Output Deadband
-        val finalA = applyDeadband(valA, outputs.deadbandA)
-        val finalB = applyDeadband(valB, outputs.deadbandB)
+        // MOTOR B:
+        val dirB = if (outputs.invertMotorB) -motorB_demand else motorB_demand
+        val epaB = mapDemandToEpa(dirB, outputs.minEpaMotorB, outputs.maxEpaMotorB)
+        val finalB = applyDeadband(epaB.coerceIn(-255, 255), outputs.deadbandB)
 
         outputMotorA.value = finalA
         outputMotorB.value = finalB
-        outputServo.value = valS
+        outputServo.value = servo_deg
 
-        sendPayloadImmediate(finalA, finalB, valS, outputs.tractionHardwareMode)
+        val isConnected = (connectionStatus.value == ConnectionStatus.CONNECTED)
+        val inTestMode = _isTestMode.value
+
+        if (isConnected && !inTestMode) {
+            sendPayloadImmediate(finalA, finalB, servo_deg, outputs.tractionHardwareMode)
+        } else {
+            val tag = if (inTestMode) "TEST" else "SIM"
+            _lastSentMessage.value = "$tag: A,$finalA,B,$finalB,S,$servo_deg,M,${outputs.tractionHardwareMode}\\n"
+        }
     }
 
     private fun sendPayloadImmediate(a: Int, b: Int, s: Int, m: Int) {
         val payload = "A,$a,B,$b,S,$s,M,$m\n"
         val success = bluetoothService.write(payload)
         if (success) {
-            _lastSentMessage.value = "A,$a,B,$b,S,$s,M,$m\\n"
+            _lastSentMessage.value = "TX: A,$a,B,$b,S,$s,M,$m\\n"
+        } else {
+            _lastSentMessage.value = "ERR: A,$a,B,$b,S,$s,M,$m\\n"
         }
     }
 

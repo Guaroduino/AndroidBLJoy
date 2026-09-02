@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
@@ -22,11 +23,16 @@ data class UpdateInfo(
     val forceUpdate: Boolean
 )
 
+enum class InstallResult {
+    SUCCESS,
+    NEED_PERMISSION,
+    ERROR
+}
+
 class UpdateManager(private val context: Context) {
 
     // The update URL on Firebase Storage for bucket: androidblejoy.firebasestorage.app
     private val updateJsonUrl = "https://storage.googleapis.com/androidblejoy.firebasestorage.app/updates/update.json"
-
 
     fun getCurrentVersionCode(): Long {
         return try {
@@ -95,7 +101,9 @@ class UpdateManager(private val context: Context) {
 
             if (connection.responseCode == HttpURLConnection.HTTP_OK) {
                 val contentLength = connection.contentLength
-                val updatesDir = File(context.cacheDir, "updates")
+                // Use external files dir for maximum compatibility with PackageInstaller across vendors
+                val baseDir = context.getExternalFilesDir(null) ?: context.cacheDir
+                val updatesDir = File(baseDir, "updates")
                 if (!updatesDir.exists()) {
                     updatesDir.mkdirs()
                 }
@@ -129,18 +137,45 @@ class UpdateManager(private val context: Context) {
         return@withContext null
     }
 
-    fun installApk(apkFile: File) {
+    fun installApk(apkFile: File): InstallResult {
         try {
+            if (!apkFile.exists() || apkFile.length() == 0L) {
+                return InstallResult.ERROR
+            }
+
+            // Android 8.0+ (API 26+) check for unknown sources permission
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (!context.packageManager.canRequestPackageInstalls()) {
+                    val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(settingsIntent)
+                    return InstallResult.NEED_PERMISSION
+                }
+            }
+
             val authority = "${context.packageName}.fileprovider"
             val apkUri = FileProvider.getUriForFile(context, authority, apkFile)
             
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(apkUri, "application/vnd.android.package-archive")
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
+
+            // Grant URI permission explicitly to any matching package installer
+            val resolveInfos = context.packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+            for (info in resolveInfos) {
+                context.grantUriPermission(info.activityInfo.packageName, apkUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+
             context.startActivity(intent)
+            return InstallResult.SUCCESS
         } catch (e: Exception) {
             e.printStackTrace()
+            return InstallResult.ERROR
         }
     }
 }

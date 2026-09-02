@@ -14,6 +14,10 @@ import androidx.lifecycle.ViewModelProvider
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.WindowManager
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.example.androidbljoy.data.BluetoothService
 import com.example.androidbljoy.data.repository.ModelRepository
 import com.example.androidbljoy.theme.AndroidBLJoyTheme
@@ -46,10 +50,34 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     bluetoothService = BluetoothService.getInstance(this)
 
-    enableEdgeToEdge()
+    // Keep screen on while controlling/testing
+    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+    // True immersive fullscreen: hides status bar and navigation bar completely
+    hideSystemBars()
+
     setContent {
       AndroidBLJoyTheme(appTheme = appThemeState.value) { Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { MainNavigation(viewModel) } }
     }
+  }
+
+  override fun onResume() {
+    super.onResume()
+    hideSystemBars()
+  }
+
+  override fun onWindowFocusChanged(hasFocus: Boolean) {
+    super.onWindowFocusChanged(hasFocus)
+    if (hasFocus) {
+      hideSystemBars()
+    }
+  }
+
+  private fun hideSystemBars() {
+    val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+    windowInsetsController.systemBarsBehavior =
+        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
   }
 
   override fun onPause() {

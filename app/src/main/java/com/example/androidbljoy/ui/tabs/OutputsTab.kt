@@ -18,6 +18,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -27,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -80,16 +82,16 @@ fun OutputsTab(
                     )
 
                     when (mode) {
-                        DrivingMode.DUAL_DC, DrivingMode.ARCADE -> {
+                        DrivingMode.ARCADE, DrivingMode.TANK -> {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Invertir Canal Tracción / Motor A", color = OffWhite, fontSize = 11.sp)
+                                Text("Invertir Motor A (Rueda / Oruga Izq)", color = OffWhite, fontSize = 11.sp)
                                 CustomSwitch(
-                                    checked = outputs.invertTraction,
-                                    onCheckedChange = { viewModel.updateOutputs { o -> o.copy(invertTraction = it) } }
+                                    checked = outputs.invertMotorA,
+                                    onCheckedChange = { viewModel.updateOutputs { o -> o.copy(invertMotorA = it) } }
                                 )
                             }
                             Row(
@@ -97,24 +99,24 @@ fun OutputsTab(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Invertir Canal Dirección / Motor B", color = OffWhite, fontSize = 11.sp)
+                                Text("Invertir Motor B (Rueda / Oruga Der)", color = OffWhite, fontSize = 11.sp)
                                 CustomSwitch(
-                                    checked = outputs.invertSteering,
-                                    onCheckedChange = { viewModel.updateOutputs { o -> o.copy(invertSteering = it) } }
+                                    checked = outputs.invertMotorB,
+                                    onCheckedChange = { viewModel.updateOutputs { o -> o.copy(invertMotorB = it) } }
                                 )
                             }
                         }
 
-                        DrivingMode.TANK -> {
+                        DrivingMode.DUAL_DC -> {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Invertir Oruga Izquierda", color = OffWhite, fontSize = 11.sp)
+                                Text("Invertir Motor A (Tracción Trasera)", color = OffWhite, fontSize = 11.sp)
                                 CustomSwitch(
-                                    checked = outputs.invertLeftTrack,
-                                    onCheckedChange = { viewModel.updateOutputs { o -> o.copy(invertLeftTrack = it) } }
+                                    checked = outputs.invertMotorA,
+                                    onCheckedChange = { viewModel.updateOutputs { o -> o.copy(invertMotorA = it) } }
                                 )
                             }
                             Row(
@@ -122,10 +124,10 @@ fun OutputsTab(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Invertir Oruga Derecha", color = OffWhite, fontSize = 11.sp)
+                                Text("Invertir Motor B (Dirección DC Delantera)", color = OffWhite, fontSize = 11.sp)
                                 CustomSwitch(
-                                    checked = outputs.invertRightTrack,
-                                    onCheckedChange = { viewModel.updateOutputs { o -> o.copy(invertRightTrack = it) } }
+                                    checked = outputs.invertMotorB,
+                                    onCheckedChange = { viewModel.updateOutputs { o -> o.copy(invertMotorB = it) } }
                                 )
                             }
                         }
@@ -138,8 +140,8 @@ fun OutputsTab(
                             ) {
                                 Text("Invertir Tracción Motor", color = OffWhite, fontSize = 11.sp)
                                 CustomSwitch(
-                                    checked = outputs.invertTraction,
-                                    onCheckedChange = { viewModel.updateOutputs { o -> o.copy(invertTraction = it) } }
+                                    checked = outputs.invertMotorA,
+                                    onCheckedChange = { viewModel.updateOutputs { o -> o.copy(invertMotorA = it) } }
                                 )
                             }
                             Row(
@@ -169,114 +171,143 @@ fun OutputsTab(
             ) {
                 Column(
                     modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "EPA (End Point Adjustment / Límites Máximos)",
+                        text = "EPA (End Point Adjustment / Límites de Recorrido)",
                         color = CyberPrimary,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Limita la potencia o ángulo máximo para proteger la mecánica y evitar forzar los actuadores.",
+                        text = "Configura los límites máximos independientes para proteger la mecánica y ajustar el recorrido superior e inferior.",
                         color = MutedText,
                         fontSize = 10.sp
                     )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        // EPA Tracción
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("EPA Tracción (PWM Máx)", color = OffWhite, fontSize = 11.sp)
-                                Text("${outputs.tractionLimit}", color = CyberPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Slider(
-                                value = outputs.tractionLimit.toFloat(),
-                                onValueChange = { viewModel.updateOutputs { o -> o.copy(tractionLimit = it.toInt()) } },
-                                valueRange = 50f..255f,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = CyberPrimary,
-                                    activeTrackColor = CyberPrimary,
-                                    inactiveTrackColor = CyberSurfaceVariant
-                                ),
-                                modifier = Modifier.height(24.dp)
+                    when (mode) {
+                        DrivingMode.ARCADE, DrivingMode.TANK -> {
+                            MotorEpaRangeControl(
+                                title = "BANDA EPA MOTOR A (IZQUIERDA)",
+                                subtitle = "Rango de salida física para la rueda u oruga izquierda",
+                                minVal = outputs.minEpaMotorA,
+                                maxVal = outputs.maxEpaMotorA,
+                                onRangeChange = { min, max ->
+                                    viewModel.updateOutputs { o -> o.copy(minEpaMotorA = min, maxEpaMotorA = max) }
+                                }
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            MotorEpaRangeControl(
+                                title = "BANDA EPA MOTOR B (DERECHA)",
+                                subtitle = "Rango de salida física para la rueda u oruga derecha",
+                                minVal = outputs.minEpaMotorB,
+                                maxVal = outputs.maxEpaMotorB,
+                                onRangeChange = { min, max ->
+                                    viewModel.updateOutputs { o -> o.copy(minEpaMotorB = min, maxEpaMotorB = max) }
+                                }
                             )
                         }
 
-                        // EPA Dirección o Servo
-                        if (mode == DrivingMode.SERVO_CAR) {
-                            Column(modifier = Modifier.weight(1f)) {
+                        DrivingMode.DUAL_DC -> {
+                            MotorEpaRangeControl(
+                                title = "BANDA EPA MOTOR A (TRACCIÓN TRASERA)",
+                                subtitle = "Rango de potencia Reversa / Avance",
+                                minVal = outputs.minEpaMotorA,
+                                maxVal = outputs.maxEpaMotorA,
+                                onRangeChange = { min, max ->
+                                    viewModel.updateOutputs { o -> o.copy(minEpaMotorA = min, maxEpaMotorA = max) }
+                                }
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            MotorEpaRangeControl(
+                                title = "BANDA EPA MOTOR B (DIRECCIÓN DC DELANTERA)",
+                                subtitle = "Rango de potencia Giro Izq / Giro Der",
+                                minVal = outputs.minEpaMotorB,
+                                maxVal = outputs.maxEpaMotorB,
+                                onRangeChange = { min, max ->
+                                    viewModel.updateOutputs { o -> o.copy(minEpaMotorB = min, maxEpaMotorB = max) }
+                                }
+                            )
+                        }
+
+                        DrivingMode.SERVO_CAR -> {
+                            MotorEpaRangeControl(
+                                title = "BANDA EPA MOTOR DE TRACCIÓN",
+                                subtitle = "Rango de potencia Reversa / Avance",
+                                minVal = outputs.minEpaMotorA,
+                                maxVal = outputs.maxEpaMotorA,
+                                onRangeChange = { min, max ->
+                                    viewModel.updateOutputs { o -> o.copy(minEpaMotorA = min, maxEpaMotorA = max) }
+                                }
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = "LÍMITES DE DIRECCIÓN (SERVO)",
+                                color = OffWhite,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("End Point Izquierdo (Giro Izq)", color = OffWhite, fontSize = 11.sp)
+                                        Text("${outputs.epaServoLeft}%", color = CyberPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Slider(
+                                        value = outputs.epaServoLeft.toFloat(),
+                                        onValueChange = { viewModel.updateOutputs { o -> o.copy(epaServoLeft = it.toInt()) } },
+                                        valueRange = 10f..100f,
+                                        colors = SliderDefaults.colors(thumbColor = CyberPrimary, activeTrackColor = CyberPrimary, inactiveTrackColor = CyberSurfaceVariant),
+                                        modifier = Modifier.height(24.dp)
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("End Point Derecho (Giro Der)", color = OffWhite, fontSize = 11.sp)
+                                        Text("${outputs.epaServoRight}%", color = CyberPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Slider(
+                                        value = outputs.epaServoRight.toFloat(),
+                                        onValueChange = { viewModel.updateOutputs { o -> o.copy(epaServoRight = it.toInt()) } },
+                                        valueRange = 10f..100f,
+                                        colors = SliderDefaults.colors(thumbColor = CyberPrimary, activeTrackColor = CyberPrimary, inactiveTrackColor = CyberSurfaceVariant),
+                                        modifier = Modifier.height(24.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Column(modifier = Modifier.fillMaxWidth()) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("EPA Servo Dirección", color = OffWhite, fontSize = 11.sp)
-                                    Text("${outputs.epaSteering}%", color = CyberPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text("Subtrim Servo (Centro Mecánico)", color = OffWhite, fontSize = 11.sp)
+                                    Text("${if (outputs.trimSteering >= 0) "+" else ""}${outputs.trimSteering}°", color = CyberPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Slider(
-                                    value = outputs.epaSteering.toFloat(),
-                                    onValueChange = { viewModel.updateOutputs { o -> o.copy(epaSteering = it.toInt()) } },
-                                    valueRange = 10f..100f,
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = CyberPrimary,
-                                        activeTrackColor = CyberPrimary,
-                                        inactiveTrackColor = CyberSurfaceVariant
-                                    ),
+                                    value = outputs.trimSteering.toFloat(),
+                                    onValueChange = { viewModel.updateOutputs { o -> o.copy(trimSteering = it.toInt()) } },
+                                    valueRange = -45f..45f,
+                                    colors = SliderDefaults.colors(thumbColor = CyberPrimary, activeTrackColor = CyberPrimary, inactiveTrackColor = CyberSurfaceVariant),
                                     modifier = Modifier.height(24.dp)
                                 )
                             }
-                        } else {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("EPA Dirección (PWM Máx)", color = OffWhite, fontSize = 11.sp)
-                                    Text("${outputs.steeringLimit}", color = CyberPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                                Slider(
-                                    value = outputs.steeringLimit.toFloat(),
-                                    onValueChange = { viewModel.updateOutputs { o -> o.copy(steeringLimit = it.toInt()) } },
-                                    valueRange = 50f..255f,
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = CyberPrimary,
-                                        activeTrackColor = CyberPrimary,
-                                        inactiveTrackColor = CyberSurfaceVariant
-                                    ),
-                                    modifier = Modifier.height(24.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    // Subtrim for Servo Car
-                    if (mode == DrivingMode.SERVO_CAR) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("Subtrim Servo (Centro Mecánico)", color = OffWhite, fontSize = 11.sp)
-                                Text("${if (outputs.trimSteering >= 0) "+" else ""}${outputs.trimSteering}°", color = CyberPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Slider(
-                                value = outputs.trimSteering.toFloat(),
-                                onValueChange = { viewModel.updateOutputs { o -> o.copy(trimSteering = it.toInt()) } },
-                                valueRange = -45f..45f,
-                                colors = SliderDefaults.colors(
-                                    thumbColor = CyberPrimary,
-                                    activeTrackColor = CyberPrimary,
-                                    inactiveTrackColor = CyberSurfaceVariant
-                                ),
-                                modifier = Modifier.height(24.dp)
-                            )
                         }
                     }
                 }
@@ -388,6 +419,74 @@ fun OutputsTab(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MotorEpaRangeControl(
+    title: String,
+    subtitle: String,
+    minVal: Int,
+    maxVal: Int,
+    onRangeChange: (Int, Int) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(CyberSurfaceVariant.copy(alpha = 0.35f))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, color = OffWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text(subtitle, color = MutedText, fontSize = 9.sp)
+            }
+
+            val badgeText = when {
+                minVal < 0 && maxVal > 0 -> "Banda: [$minVal ... +$maxVal]"
+                minVal >= 0 && maxVal > 0 -> "Solo Avance [+$minVal ... +$maxVal]"
+                minVal < 0 && maxVal <= 0 -> "Solo Reversa [$minVal ... $maxVal]"
+                else -> "Bloqueado [0]"
+            }
+            Text(
+                text = badgeText,
+                color = CyberPrimary,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+
+        RangeSlider(
+            value = minVal.toFloat()..maxVal.toFloat(),
+            onValueChange = { range ->
+                val newMin = range.start.toInt().coerceIn(-255, 255)
+                val newMax = range.endInclusive.toInt().coerceIn(-255, 255)
+                onRangeChange(newMin, newMax)
+            },
+            valueRange = -255f..255f,
+            colors = SliderDefaults.colors(
+                thumbColor = CyberPrimary,
+                activeTrackColor = CyberPrimary,
+                inactiveTrackColor = CyberSurface
+            ),
+            modifier = Modifier.height(28.dp)
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("Reversa Máx: $minVal", color = MutedText, fontSize = 9.sp)
+            Text("Centro: 0", color = MutedText, fontSize = 8.sp)
+            Text("Avance Máx: +$maxVal", color = MutedText, fontSize = 9.sp)
         }
     }
 }

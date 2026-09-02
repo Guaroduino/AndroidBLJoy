@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.androidbljoy"
         minSdk = 24
         targetSdk = 36
-        versionCode = 15
-        versionName = "1.14"
+        versionCode = 21
+        versionName = "1.20"
     }
 
     buildTypes {
