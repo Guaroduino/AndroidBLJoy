@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.androidbljoy.theme.CyberPrimary
@@ -40,6 +41,7 @@ import kotlin.math.sqrt
 fun Joystick(
     name: String,
     modifier: Modifier = Modifier,
+    joystickSize: Dp = 180.dp,
     isVerticalOnly: Boolean = false,
     isHorizontalOnly: Boolean = false,
     isDigital: Boolean = false,
@@ -58,15 +60,16 @@ fun Joystick(
         Text(
             text = name,
             color = OffWhite,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(3.dp))
 
         Box(
             modifier = Modifier
-                .size(180.dp)
+                .size(joystickSize)
                 .background(CyberSurfaceVariant.copy(alpha = 0.4f), CircleShape)
                 .border(2.dp, CyberPrimary.copy(alpha = 0.6f), CircleShape),
             contentAlignment = Alignment.Center
@@ -76,8 +79,8 @@ fun Joystick(
                     .fillMaxSize()
                     .pointerInput(isVerticalOnly, isHorizontalOnly, isDigital) {
                         val outerRadius = size.width / 2f
-                        // Reserve some padding for the thumb (approx 28dp -> 30px)
-                        val maxDragRadius = outerRadius - 40f
+                        val thumbRadius = outerRadius * 0.22f
+                        val maxDragRadius = outerRadius - thumbRadius - 4f
 
                         detectDragGestures(
                             onDragStart = {
@@ -200,7 +203,8 @@ fun Joystick(
                 }
 
                 // Calculate final visual offset
-                val maxDragRadius = outerRadius - 40f
+                val thumbRadius = outerRadius * 0.22f
+                val maxDragRadius = outerRadius - thumbRadius - 4f
                 val activeOffset = if (isDragging) {
                     thumbOffset
                 } else {
@@ -210,12 +214,11 @@ fun Joystick(
                 }
 
                 // Draw thumb (the draggable knob)
-                val thumbRadius = 25f
                 val thumbCenter = center + activeOffset
                 
                 // Outer glow circle
                 drawCircle(
-                    color = CyberPrimary.copy(alpha = 0.3f),
+                    color = CyberPrimary.copy(alpha = 0.35f),
                     radius = thumbRadius + 10f,
                     center = thumbCenter
                 )
@@ -223,7 +226,7 @@ fun Joystick(
                 // Main inner knob
                 drawCircle(
                     brush = Brush.radialGradient(
-                        colors = listOf(CyberPrimary, CyberPrimary.copy(alpha = 0.7f)),
+                        colors = listOf(CyberPrimary, CyberPrimary.copy(alpha = 0.75f), Color(0xFF003040)),
                         center = thumbCenter,
                         radius = thumbRadius
                     ),
@@ -233,8 +236,8 @@ fun Joystick(
 
                 // Knob accent center dot
                 drawCircle(
-                    color = Color.White.copy(alpha = 0.9f),
-                    radius = 5f,
+                    color = Color.White.copy(alpha = 0.95f),
+                    radius = 6f,
                     center = thumbCenter
                 )
             }

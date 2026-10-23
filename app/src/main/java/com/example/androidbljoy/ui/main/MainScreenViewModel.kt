@@ -152,6 +152,15 @@ class MainScreenViewModel(
                 0
             }
         }
+
+        fun applyInputEndpoints(value: Float, minEndpoint: Int, maxEndpoint: Int): Float {
+            val scale = if (value >= 0f) {
+                (maxEndpoint.coerceIn(0, 100)) / 100f
+            } else {
+                (minEndpoint.coerceIn(0, 100)) / 100f
+            }
+            return (value * scale).coerceIn(-1f, 1f)
+        }
     }
 
     private fun applyDeadband(motorValue: Int, deadband: Int): Int {
@@ -164,7 +173,7 @@ class MainScreenViewModel(
 
     private fun calculateAndSend() {
         val model = activeModel.value
-        val inputs = model.inputs
+        val inputs = model.inputs.normalized()
         val mixer = model.mixer
         val outputs = model.outputs.normalized()
 
@@ -176,12 +185,16 @@ class MainScreenViewModel(
         val tExpo = calculateExpo(rawT, inputs.tractionExpo)
         val sExpo = calculateExpo(rawS, inputs.steeringExpo)
 
+        // 3. Apply Endpoints (EPA per axis)
+        val tEpa = applyInputEndpoints(tExpo, inputs.tractionMinEndpoint, inputs.tractionMaxEndpoint)
+        val sEpa = applyInputEndpoints(sExpo, inputs.steeringMinEndpoint, inputs.steeringMaxEndpoint)
+
         // Screen Quick Trims (-0.2f .. +0.2f normalized)
         val trimT = (inputs.tractionTrim / 50f) * 0.2f
         val trimS = (inputs.steeringTrim / 50f) * 0.2f
 
-        val inT = (tExpo + trimT).coerceIn(-1f, 1f)
-        val inS = (sExpo + trimS).coerceIn(-1f, 1f)
+        val inT = (tEpa + trimT).coerceIn(-1f, 1f)
+        val inS = (sEpa + trimS).coerceIn(-1f, 1f)
 
         var motorA_demand = 0f
         var motorB_demand = 0f
@@ -196,35 +209,53 @@ class MainScreenViewModel(
                 var left = 0f
                 var right = 0f
 
-                if (mixer.arcadeMixMode == 1) {
-                    // CURVATURA CONSTANTE (Cheesy Drive)
-                    val forward = inT * weightT
-                    val turnRate = inS * weightS
+                when (mixer.arcadeMixMode) {
+                    1 -> {
+                        // CURVATURA CONSTANTE (Cheesy Drive)
+                        val forward = inT * weightT
+                        val turnRate = inS * weightS
 
-                    if (kotlin.math.abs(forward) <= 0.08f) {
-                        // Quick-Turn: Giro en el sitio cuando está detenido
-                        left = turnRate
-                        right = -turnRate
-                    } else {
-                        // Curvatura proporcional en movimiento
-                        val turn = kotlin.math.abs(forward) * turnRate
-                        left = forward + turn
-                        right = forward - turn
+                        if (kotlin.math.abs(forward) <= 0.08f) {
+                            // Quick-Turn: Giro en el sitio cuando está detenido
+                            left = turnRate
+                            right = -turnRate
+                        } else {
+                            // Curvatura proporcional en movimiento
+                            val turn = kotlin.math.abs(forward) * turnRate
+                            left = forward + turn
+                            right = forward - turn
 
-                        // Preservar la curvatura exacta sin saturación
-                        val maxMag = maxOf(kotlin.math.abs(left), kotlin.math.abs(right))
-                        if (maxMag > 1.0f) {
-                            left /= maxMag
-                            right /= maxMag
+                            // Preservar la curvatura exacta sin saturación
+                            val maxMag = maxOf(kotlin.math.abs(left), kotlin.math.abs(right))
+                            if (maxMag > 1.0f) {
+                                left /= maxMag
+                                right /= maxMag
+                            }
                         }
                     }
-                } else {
-                    // LINEAL CLÁSICO (Suma y resta diferencial)
-                    val throttle = inT * weightT
-                    val steering = inS * weightS
+                    2 -> {
+                        // TIPO CARRO / ACKERMAN (Rueda interior desacelerada, sin giro en reposo)
+                        val throttle = inT * weightT
+                        val turnReduction = kotlin.math.abs(inS) * weightS
 
-                    left = (throttle + steering).coerceIn(-1f, 1f)
-                    right = (throttle - steering).coerceIn(-1f, 1f)
+                        if (inS >= 0f) {
+                            // Giro a la derecha: rueda exterior (izq) mantiene tracción, rueda interior (der) desacelera
+                            left = throttle
+                            right = throttle * (1f - turnReduction)
+                        } else {
+                            // Giro a la izquierda: rueda interior (izq) desacelera, rueda exterior (der) mantiene tracción
+                            left = throttle * (1f - turnReduction)
+                            right = throttle
+                        }
+                    }
+                    else -> {
+                        // LINEAL CLÁSICO (Suma y resta diferencial)
+                        val throttle = inT * weightT
+                        val steering = inS * weightS
+
+                        left = (throttle + steering).coerceIn(-1f, 1f)
+                        right = (throttle - steering).coerceIn(-1f, 1f)
+                    }
                 }
 
                 if (mixer.swapAB) {

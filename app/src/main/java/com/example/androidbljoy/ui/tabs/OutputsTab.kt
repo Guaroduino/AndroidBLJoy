@@ -54,31 +54,26 @@ fun OutputsTab(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         // Section: Inversión de Sentido (Reverse por Canal)
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = CyberSurface.copy(alpha = 0.9f)),
                 border = BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.4f)),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
                         text = "Inversión de Sentido Físico (Reverse)",
                         color = CyberPrimary,
-                        fontSize = 13.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Invierte la rotación del motor o el giro del servo si los cables o varillas mecánicas están al revés.",
-                        color = MutedText,
-                        fontSize = 10.sp
                     )
 
                     when (mode) {
@@ -166,23 +161,18 @@ fun OutputsTab(
             Card(
                 colors = CardDefaults.cardColors(containerColor = CyberSurface.copy(alpha = 0.9f)),
                 border = BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.4f)),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
-                        text = "EPA (End Point Adjustment / Límites de Recorrido)",
+                        text = "EPA (Límites de Recorrido de Salida)",
                         color = CyberPrimary,
-                        fontSize = 13.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Configura los límites máximos independientes para proteger la mecánica y ajustar el recorrido superior e inferior.",
-                        color = MutedText,
-                        fontSize = 10.sp
                     )
 
                     when (mode) {

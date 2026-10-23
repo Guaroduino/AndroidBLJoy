@@ -49,36 +49,31 @@ fun InputsTab(
     val tractionVal by viewModel.tractionValue.collectAsStateWithLifecycle()
     val steeringVal by viewModel.steeringValue.collectAsStateWithLifecycle()
 
-    val inputs = activeModel.inputs
+    val inputs = activeModel.inputs.normalized()
 
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         // Section: Curvas Exponenciales (Expo) con Gráfico Interactivo
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = CyberSurface.copy(alpha = 0.9f)),
                 border = BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.4f)),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
                         text = "Curvas Exponenciales (Inputs Expo)",
                         color = CyberPrimary,
-                        fontSize = 13.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Valores positivos (+): centro suave para maniobras de precisión. Valores negativos (-): respuesta agresiva y reactiva al menor toque.",
-                        color = MutedText,
-                        fontSize = 10.sp
                     )
 
                     Row(
@@ -180,28 +175,23 @@ fun InputsTab(
             Card(
                 colors = CardDefaults.cardColors(containerColor = CyberSurface.copy(alpha = 0.9f)),
                 border = BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.4f)),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
                         text = "Zona Muerta del Stick (Deadzone)",
                         color = CyberPrimary,
-                        fontSize = 13.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Elimina derivas en reposo. El recorrido se reescala suavemente desde 0% justo al salir de la zona muerta, sin saltos bruscos de aceleración.",
-                        color = MutedText,
-                        fontSize = 10.sp
                     )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         // Deadzone Tracción
                         Column(modifier = Modifier.weight(1f)) {
@@ -209,8 +199,8 @@ fun InputsTab(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Deadzone Tracción", color = OffWhite, fontSize = 11.sp)
-                                Text("${(inputs.tractionDeadzone * 100).toInt()}%", color = CyberPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Deadzone Tracción", color = OffWhite, fontSize = 10.sp)
+                                Text("${(inputs.tractionDeadzone * 100).toInt()}%", color = CyberPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                             Slider(
                                 value = inputs.tractionDeadzone,
@@ -231,8 +221,8 @@ fun InputsTab(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Deadzone Dirección", color = OffWhite, fontSize = 11.sp)
-                                Text("${(inputs.steeringDeadzone * 100).toInt()}%", color = CyberPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Deadzone Dirección", color = OffWhite, fontSize = 10.sp)
+                                Text("${(inputs.steeringDeadzone * 100).toInt()}%", color = CyberPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                             Slider(
                                 value = inputs.steeringDeadzone,
@@ -251,22 +241,180 @@ fun InputsTab(
             }
         }
 
+        // Section: Ajuste de Endpoints (EPA de Entrada por Eje)
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CyberSurface.copy(alpha = 0.9f)),
+                border = BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.4f)),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "Ajuste de Endpoints (EPA de Entrada)",
+                        color = CyberPrimary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    // Eje de Tracción / Acelerador
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CyberSurfaceVariant.copy(alpha = 0.35f)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "EJE DE TRACCIÓN (ACELERADOR)",
+                                color = OffWhite,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                // Mínimo (Reversa / Freno)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Mínimo (Reversa)", color = OffWhite, fontSize = 10.sp)
+                                        Text("${inputs.tractionMinEndpoint}%", color = CyberPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Slider(
+                                        value = inputs.tractionMinEndpoint.toFloat(),
+                                        onValueChange = { viewModel.updateInputs { inp -> inp.copy(tractionMinEndpoint = it.toInt()) } },
+                                        valueRange = 0f..100f,
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = CyberPrimary,
+                                            activeTrackColor = CyberPrimary,
+                                            inactiveTrackColor = CyberSurfaceVariant
+                                        ),
+                                        modifier = Modifier.height(24.dp)
+                                    )
+                                }
+
+                                // Máximo (Avance)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Máximo (Avance)", color = OffWhite, fontSize = 10.sp)
+                                        Text("${inputs.tractionMaxEndpoint}%", color = CyberPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Slider(
+                                        value = inputs.tractionMaxEndpoint.toFloat(),
+                                        onValueChange = { viewModel.updateInputs { inp -> inp.copy(tractionMaxEndpoint = it.toInt()) } },
+                                        valueRange = 0f..100f,
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = CyberPrimary,
+                                            activeTrackColor = CyberPrimary,
+                                            inactiveTrackColor = CyberSurfaceVariant
+                                        ),
+                                        modifier = Modifier.height(24.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Eje de Dirección / Giro
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CyberSurfaceVariant.copy(alpha = 0.35f)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "EJE DE DIRECCIÓN (GIRO)",
+                                color = OffWhite,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                // Mínimo (Giro Izquierdo)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Mínimo (Giro Izq)", color = OffWhite, fontSize = 10.sp)
+                                        Text("${inputs.steeringMinEndpoint}%", color = CyberPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Slider(
+                                        value = inputs.steeringMinEndpoint.toFloat(),
+                                        onValueChange = { viewModel.updateInputs { inp -> inp.copy(steeringMinEndpoint = it.toInt()) } },
+                                        valueRange = 0f..100f,
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = CyberPrimary,
+                                            activeTrackColor = CyberPrimary,
+                                            inactiveTrackColor = CyberSurfaceVariant
+                                        ),
+                                        modifier = Modifier.height(24.dp)
+                                    )
+                                }
+
+                                // Máximo (Giro Derecho)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("Máximo (Giro Der)", color = OffWhite, fontSize = 10.sp)
+                                        Text("${inputs.steeringMaxEndpoint}%", color = CyberPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Slider(
+                                        value = inputs.steeringMaxEndpoint.toFloat(),
+                                        onValueChange = { viewModel.updateInputs { inp -> inp.copy(steeringMaxEndpoint = it.toInt()) } },
+                                        valueRange = 0f..100f,
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = CyberPrimary,
+                                            activeTrackColor = CyberPrimary,
+                                            inactiveTrackColor = CyberSurfaceVariant
+                                        ),
+                                        modifier = Modifier.height(24.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Section: Configuración de los Joysticks
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = CyberSurface.copy(alpha = 0.9f)),
                 border = BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.4f)),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
                         text = "Disposición de Mandos en Pantalla",
                         color = CyberPrimary,
-                        fontSize = 13.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
 
@@ -275,10 +423,7 @@ fun InputsTab(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text("Joystick Unificado (Una sola mano)", color = OffWhite, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Controla aceleración y dirección en un solo joystick 2D", color = MutedText, fontSize = 9.sp)
-                        }
+                        Text("Joystick Unificado (2D)", color = OffWhite, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                         CustomSwitch(
                             checked = inputs.unifiedJoystick,
                             onCheckedChange = { viewModel.updateInputs { inp -> inp.copy(unifiedJoystick = it) } }
@@ -290,28 +435,25 @@ fun InputsTab(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text("Eje de Tracción / Acelerador", color = OffWhite, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Controla con movimiento vertical (arriba/abajo) u horizontal", color = MutedText, fontSize = 9.sp)
-                        }
+                        Text("Eje Tracción", color = OffWhite, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .clip(RoundedCornerShape(4.dp))
                                     .background(if (inputs.tractionAxisVertical) CyberPrimary else CyberSurfaceVariant)
                                     .clickable { viewModel.updateInputs { inp -> inp.copy(tractionAxisVertical = true) } }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
-                                Text("↕ Vertical (Y)", color = if (inputs.tractionAxisVertical) Color.Black else OffWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                Text("↕ Y", color = if (inputs.tractionAxisVertical) Color.Black else OffWhite, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                             }
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .clip(RoundedCornerShape(4.dp))
                                     .background(if (!inputs.tractionAxisVertical) CyberPrimary else CyberSurfaceVariant)
                                     .clickable { viewModel.updateInputs { inp -> inp.copy(tractionAxisVertical = false) } }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
-                                Text("↔ Horizontal (X)", color = if (!inputs.tractionAxisVertical) Color.Black else OffWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                Text("↔ X", color = if (!inputs.tractionAxisVertical) Color.Black else OffWhite, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -321,28 +463,25 @@ fun InputsTab(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text("Eje de Dirección / Giro", color = OffWhite, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Gira con movimiento horizontal (izq/der) o vertical", color = MutedText, fontSize = 9.sp)
-                        }
+                        Text("Eje Dirección", color = OffWhite, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .clip(RoundedCornerShape(4.dp))
                                     .background(if (inputs.steeringAxisHorizontal) CyberPrimary else CyberSurfaceVariant)
                                     .clickable { viewModel.updateInputs { inp -> inp.copy(steeringAxisHorizontal = true) } }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
-                                Text("↔ Horizontal (X)", color = if (inputs.steeringAxisHorizontal) Color.Black else OffWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                Text("↔ X", color = if (inputs.steeringAxisHorizontal) Color.Black else OffWhite, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                             }
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .clip(RoundedCornerShape(4.dp))
                                     .background(if (!inputs.steeringAxisHorizontal) CyberPrimary else CyberSurfaceVariant)
                                     .clickable { viewModel.updateInputs { inp -> inp.copy(steeringAxisHorizontal = false) } }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
-                                Text("↕ Vertical (Y)", color = if (!inputs.steeringAxisHorizontal) Color.Black else OffWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                Text("↕ Y", color = if (!inputs.steeringAxisHorizontal) Color.Black else OffWhite, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -352,10 +491,7 @@ fun InputsTab(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text(if (inputs.unifiedJoystick) "Ubicar Joystick en la Derecha" else "Intercambiar Joysticks (Modo Zurdos)", color = OffWhite, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                            Text("Invierte las posiciones de los controles en pantalla", color = MutedText, fontSize = 9.sp)
-                        }
+                        Text(if (inputs.unifiedJoystick) "Joystick a la Derecha" else "Intercambiar Mandos (Zurdos)", color = OffWhite, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                         CustomSwitch(
                             checked = inputs.swapJoysticks,
                             onCheckedChange = { viewModel.updateInputs { inp -> inp.copy(swapJoysticks = it) } }

@@ -1,6 +1,7 @@
 package com.example.androidbljoy.ui.tabs
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -29,8 +30,12 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -515,28 +520,43 @@ fun ControlTab(
 fun PressHoldButton(
     text: String,
     modifier: Modifier = Modifier,
+    activeColor: Color = CyberPrimary,
     onPressed: () -> Unit,
     onReleased: () -> Unit
 ) {
-    Button(
-        onClick = {},
-        modifier = modifier.pointerInput(Unit) {
-            awaitEachGesture {
-                awaitFirstDown()
-                onPressed()
-                waitForUpOrCancellation()
-                onReleased()
-            }
-        },
-        colors = ButtonDefaults.buttonColors(containerColor = CyberSurfaceVariant.copy(alpha = 0.8f)),
-        shape = RoundedCornerShape(8.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(2.dp)
+    var isPressed by remember { mutableStateOf(false) }
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                if (isPressed) activeColor.copy(alpha = 0.35f) else CyberSurfaceVariant.copy(alpha = 0.85f)
+            )
+            .border(
+                1.5.dp,
+                if (isPressed) activeColor else CyberSurfaceVariant,
+                RoundedCornerShape(8.dp)
+            )
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    down.consume()
+                    isPressed = true
+                    onPressed()
+                    val upOrCancel = waitForUpOrCancellation()
+                    upOrCancel?.consume()
+                    isPressed = false
+                    onReleased()
+                }
+            },
+        contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
-            color = OffWhite,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold
+            color = if (isPressed) activeColor else OffWhite,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
         )
     }
 }

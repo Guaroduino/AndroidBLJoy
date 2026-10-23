@@ -51,36 +51,31 @@ fun MixerTab(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         // Mode Selector Cards
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = CyberSurface.copy(alpha = 0.9f)),
                 border = BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.4f)),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
-                        text = "Tipo de Vehículo y Algoritmo de Mezcla",
+                        text = "Tipo de Vehículo",
                         color = CyberPrimary,
-                        fontSize = 13.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "El mezclador traduce los movimientos de los sticks en los canales correctos de tu vehículo.",
-                        color = MutedText,
-                        fontSize = 10.sp
                     )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         DrivingMode.values().forEach { mode ->
                             val isSelected = (currentMode == mode)
@@ -108,17 +103,17 @@ fun MixerTab(
                                     1.5.dp,
                                     if (isSelected) CyberPrimary else CyberSurfaceVariant
                                 ),
-                                shape = RoundedCornerShape(8.dp)
+                                shape = RoundedCornerShape(6.dp)
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(8.dp),
+                                    modifier = Modifier.padding(6.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center
                                 ) {
                                     Text(
                                         text = title,
                                         color = if (isSelected) CyberPrimary else OffWhite,
-                                        fontSize = 11.sp,
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
@@ -140,41 +135,36 @@ fun MixerTab(
             Card(
                 colors = CardDefaults.cardColors(containerColor = CyberSurface.copy(alpha = 0.9f)),
                 border = BorderStroke(1.dp, CyberPrimary.copy(alpha = 0.4f)),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
-                        text = "Configuración de Mezclador del Modelo",
+                        text = "Configuración de Mezclador",
                         color = CyberPrimary,
-                        fontSize = 13.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
 
                     when (currentMode) {
                         DrivingMode.ARCADE -> {
-                            Text(
-                                text = "El mezclador Arcade permite controlar un tanque o rover diferencial con un solo stick (o dos ejes: tracción y dirección).",
-                                color = MutedText,
-                                fontSize = 10.sp
-                            )
-
                             // Mix Algorithm Selector
                             Text(
                                 text = "ALGORITMO DE MEZCLA DIFERENCIAL",
                                 color = OffWhite,
-                                fontSize = 11.sp,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 val isLinear = (mixer.arcadeMixMode == 0)
                                 val isCurvature = (mixer.arcadeMixMode == 1)
+                                val isCar = (mixer.arcadeMixMode == 2)
 
                                 Card(
                                     modifier = Modifier
@@ -187,12 +177,12 @@ fun MixerTab(
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Column(
-                                        modifier = Modifier.padding(8.dp),
+                                        modifier = Modifier.padding(6.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
-                                        Text("Lineal Clásico", color = if (isLinear) CyberPrimary else OffWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text("Lineal", color = if (isLinear) CyberPrimary else OffWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                         Spacer(modifier = Modifier.height(2.dp))
-                                        Text("Suma/Resta directa (A=T+S, B=T-S)", color = MutedText, fontSize = 8.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                        Text("Suma directa (A=T+S, B=T-S)", color = MutedText, fontSize = 8.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                                     }
                                 }
 
@@ -207,12 +197,32 @@ fun MixerTab(
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Column(
-                                        modifier = Modifier.padding(8.dp),
+                                        modifier = Modifier.padding(6.dp),
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
-                                        Text("Curvatura (Cheesy)", color = if (isCurvature) CyberPrimary else OffWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text("Curvatura", color = if (isCurvature) CyberPrimary else OffWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                         Spacer(modifier = Modifier.height(2.dp))
-                                        Text("Radio constante + Quick-Turn en parado", color = MutedText, fontSize = 8.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                        Text("Radio cte. + Quick-Turn", color = MutedText, fontSize = 8.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                    }
+                                }
+
+                                Card(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { viewModel.updateMixer { m -> m.copy(arcadeMixMode = 2) } },
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isCar) CyberPrimary.copy(alpha = 0.2f) else CyberSurfaceVariant.copy(alpha = 0.4f)
+                                    ),
+                                    border = BorderStroke(1.5.dp, if (isCar) CyberPrimary else CyberSurfaceVariant),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(6.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text("Tipo Carro", color = if (isCar) CyberPrimary else OffWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text("Ackerman (0 en reposo)", color = MutedText, fontSize = 8.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                                     }
                                 }
                             }
@@ -272,37 +282,64 @@ fun MixerTab(
                             ) {
                                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     Text(
-                                        text = if (mixer.arcadeMixMode == 1) "Fórmula de Curvatura Constante (Cheesy Drive):" else "Fórmula Lineal Clásica:",
+                                        text = when (mixer.arcadeMixMode) {
+                                            1 -> "Fórmula de Curvatura Constante (Cheesy Drive):"
+                                            2 -> "Fórmula Tipo Carro (Ackerman Diferencial):"
+                                            else -> "Fórmula Lineal Clásica:"
+                                        },
                                         color = MutedText,
                                         fontSize = 9.sp,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    if (mixer.arcadeMixMode == 1) {
-                                        Text(
-                                            text = "• En marcha (|T| > 8%): A = T + |T|×(S×${mixer.arcadeSteeringWeight}%), B = T - |T|×(S×${mixer.arcadeSteeringWeight}%)",
-                                            color = CyberPrimary,
-                                            fontSize = 9.sp,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                        )
-                                        Text(
-                                            text = "• En reposo (Quick-Turn): A = +(S×${mixer.arcadeSteeringWeight}%), B = -(S×${mixer.arcadeSteeringWeight}%) (Giro 360°)",
-                                            color = CyberPrimary,
-                                            fontSize = 9.sp,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                        )
-                                    } else {
-                                        Text(
-                                            text = "Motor A (Izq) = (Tracción × ${mixer.arcadeThrottleWeight}%) + (Giro × ${mixer.arcadeSteeringWeight}%)",
-                                            color = CyberPrimary,
-                                            fontSize = 9.sp,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                        )
-                                        Text(
-                                            text = "Motor B (Der) = (Tracción × ${mixer.arcadeThrottleWeight}%) - (Giro × ${mixer.arcadeSteeringWeight}%)",
-                                            color = CyberPrimary,
-                                            fontSize = 9.sp,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                                        )
+                                    when (mixer.arcadeMixMode) {
+                                        1 -> {
+                                            Text(
+                                                text = "• En marcha (|T| > 8%): A = T + |T|×(S×${mixer.arcadeSteeringWeight}%), B = T - |T|×(S×${mixer.arcadeSteeringWeight}%)",
+                                                color = CyberPrimary,
+                                                fontSize = 9.sp,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                            )
+                                            Text(
+                                                text = "• En reposo (Quick-Turn): A = +(S×${mixer.arcadeSteeringWeight}%), B = -(S×${mixer.arcadeSteeringWeight}%) (Giro 360°)",
+                                                color = CyberPrimary,
+                                                fontSize = 9.sp,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                            )
+                                        }
+                                        2 -> {
+                                            Text(
+                                                text = "• En reposo (T = 0): A = 0, B = 0 (Sin giro detenido)",
+                                                color = CyberPrimary,
+                                                fontSize = 9.sp,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                            )
+                                            Text(
+                                                text = "• Giro Der (S ≥ 0): A = T,  B = T × (1 - S×${mixer.arcadeSteeringWeight}%)",
+                                                color = CyberPrimary,
+                                                fontSize = 9.sp,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                            )
+                                            Text(
+                                                text = "• Giro Izq (S < 0): A = T × (1 - |S|×${mixer.arcadeSteeringWeight}%),  B = T",
+                                                color = CyberPrimary,
+                                                fontSize = 9.sp,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                            )
+                                        }
+                                        else -> {
+                                            Text(
+                                                text = "Motor A (Izq) = (Tracción × ${mixer.arcadeThrottleWeight}%) + (Giro × ${mixer.arcadeSteeringWeight}%)",
+                                                color = CyberPrimary,
+                                                fontSize = 9.sp,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                            )
+                                            Text(
+                                                text = "Motor B (Der) = (Tracción × ${mixer.arcadeThrottleWeight}%) - (Giro × ${mixer.arcadeSteeringWeight}%)",
+                                                color = CyberPrimary,
+                                                fontSize = 9.sp,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                            )
+                                        }
                                     }
                                 }
                             }

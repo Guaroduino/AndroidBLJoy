@@ -1,7 +1,7 @@
 {
-  "versionCode": 21,
-  "versionName": "1.20",
+  "versionCode": 24,
+  "versionName": "1.23",
   "apkUrl": "https://storage.googleapis.com/androidblejoy.firebasestorage.app/updates/app-debug.apk",
-  "releaseNotes": "Curvature Drive (Cheesy Drive) con Quick-Turn en el Mixer Arcade, y End Points unificados en RangeSlider (-255 a +255) para configurar bandas continuas asimetricas y de solo avance.",
+  "releaseNotes": "Joysticks mas grandes (180dp), botones de control tactiles de 82x38dp con respuesta continua garantizada y feedback visual activo, y botones de trim digital ampliados a 32dp",
   "forceUpdate": false
 }

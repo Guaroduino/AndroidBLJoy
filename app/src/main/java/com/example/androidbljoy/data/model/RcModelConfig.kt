@@ -10,17 +10,32 @@ enum class DrivingMode {
 }
 
 data class InputsConfig(
-    val tractionExpo: Int = 0,         // 0 to 100%
-    val steeringExpo: Int = 0,         // 0 to 100%
+    val tractionExpo: Int = 0,         // -100 to 100%
+    val steeringExpo: Int = 0,         // -100 to 100%
     val tractionDeadzone: Float = 0f,  // 0f to 0.3f
     val steeringDeadzone: Float = 0f,  // 0f to 0.3f
     val tractionTrim: Int = 0,         // -50 to 50
     val steeringTrim: Int = 0,         // -50 to 50
+    val tractionMinEndpoint: Int = 100, // Endpoint Mínimo / Reversa % (0..100)
+    val tractionMaxEndpoint: Int = 100, // Endpoint Máximo / Avance % (0..100)
+    val steeringMinEndpoint: Int = 100, // Endpoint Mínimo / Izquierda % (0..100)
+    val steeringMaxEndpoint: Int = 100, // Endpoint Máximo / Derecha % (0..100)
     val unifiedJoystick: Boolean = false,
     val swapJoysticks: Boolean = false,
     val tractionAxisVertical: Boolean = true,  // true: Eje Vertical (Y), false: Eje Horizontal (X)
     val steeringAxisHorizontal: Boolean = true // true: Eje Horizontal (X), false: Eje Vertical (Y)
-)
+) {
+    fun normalized(): InputsConfig {
+        val defaultT = (tractionMinEndpoint == 0 && tractionMaxEndpoint == 0)
+        val defaultS = (steeringMinEndpoint == 0 && steeringMaxEndpoint == 0)
+        return copy(
+            tractionMinEndpoint = if (defaultT) 100 else tractionMinEndpoint.coerceIn(0, 100),
+            tractionMaxEndpoint = if (defaultT) 100 else tractionMaxEndpoint.coerceIn(0, 100),
+            steeringMinEndpoint = if (defaultS) 100 else steeringMinEndpoint.coerceIn(0, 100),
+            steeringMaxEndpoint = if (defaultS) 100 else steeringMaxEndpoint.coerceIn(0, 100)
+        )
+    }
+}
 
 data class MixerConfig(
     val swapAB: Boolean = false,             // Swap Motor A / Motor B
@@ -28,7 +43,7 @@ data class MixerConfig(
     val servoMotorOutput: String = "A",      // "A" or "B" for SERVO_CAR
     val arcadeThrottleWeight: Int = 100,     // Peso / Sensibilidad de Tracción en Arcade (0..100%)
     val arcadeSteeringWeight: Int = 100,     // Peso / Sensibilidad de Dirección en Arcade (0..100%)
-    val arcadeMixMode: Int = 0               // 0 = LINEAL (Clásico), 1 = CURVATURA (Cheesy Drive)
+    val arcadeMixMode: Int = 0               // 0 = LINEAL (Clásico), 1 = CURVATURA (Cheesy Drive), 2 = CARRO (Ackerman)
 )
 
 data class OutputsConfig(

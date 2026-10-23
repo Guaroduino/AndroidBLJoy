@@ -116,6 +116,49 @@ class RcModelConfigTest {
     }
 
     @Test
+    fun testInputsConfigDefaultsAndNormalization() {
+        val inputs = com.example.androidbljoy.data.model.InputsConfig()
+        assertEquals(100, inputs.tractionMinEndpoint)
+        assertEquals(100, inputs.tractionMaxEndpoint)
+        assertEquals(100, inputs.steeringMinEndpoint)
+        assertEquals(100, inputs.steeringMaxEndpoint)
+
+        // Test normalization when old JSON leaves endpoints at 0
+        val oldInputs = inputs.copy(
+            tractionMinEndpoint = 0,
+            tractionMaxEndpoint = 0,
+            steeringMinEndpoint = 0,
+            steeringMaxEndpoint = 0
+        )
+        val normalized = oldInputs.normalized()
+        assertEquals(100, normalized.tractionMinEndpoint)
+        assertEquals(100, normalized.tractionMaxEndpoint)
+        assertEquals(100, normalized.steeringMinEndpoint)
+        assertEquals(100, normalized.steeringMaxEndpoint)
+    }
+
+    @Test
+    fun testApplyInputEndpoints() {
+        // Neutral demand (0.0) -> Always 0
+        assertEquals(0.0f, MainScreenViewModel.applyInputEndpoints(0f, 100, 100), 0.001f)
+        assertEquals(0.0f, MainScreenViewModel.applyInputEndpoints(0f, 60, 80), 0.001f)
+
+        // Positive demand (Advance / Right): Scaled by maxEndpoint (80%)
+        assertEquals(0.40f, MainScreenViewModel.applyInputEndpoints(0.5f, 60, 80), 0.001f)
+        assertEquals(0.80f, MainScreenViewModel.applyInputEndpoints(1.0f, 60, 80), 0.001f)
+
+        // Negative demand (Reverse / Left): Scaled by minEndpoint (60%)
+        assertEquals(-0.30f, MainScreenViewModel.applyInputEndpoints(-0.5f, 60, 80), 0.001f)
+        assertEquals(-0.60f, MainScreenViewModel.applyInputEndpoints(-1.0f, 60, 80), 0.001f)
+
+        // Block reverse (minEndpoint = 0)
+        assertEquals(0.0f, MainScreenViewModel.applyInputEndpoints(-1.0f, 0, 100), 0.001f)
+
+        // Block forward (maxEndpoint = 0)
+        assertEquals(0.0f, MainScreenViewModel.applyInputEndpoints(1.0f, 100, 0), 0.001f)
+    }
+
+    @Test
     fun testMixerConfigDefaults() {
         val mixer = com.example.androidbljoy.data.model.MixerConfig()
         assertEquals(100, mixer.arcadeThrottleWeight)
@@ -187,5 +230,66 @@ class RcModelConfigTest {
         }
         val ratioFull = leftFull / rightFull    // 3.0
         assertEquals(3.0f, ratioFull, 0.001f) // Exact same curvature maintained without saturation!
+    }
+
+    @Test
+    fun testCarAckermanDriveMixingLogic() {
+        fun computeCarMix(inT: Float, inS: Float, weightT: Float = 1.0f, weightS: Float = 1.0f): Pair<Float, Float> {
+            val throttle = inT * weightT
+            val turnReduction = kotlin.math.abs(inS) * weightS
+            val left: Float
+            val right: Float
+            if (inS >= 0f) {
+                left = throttle
+                right = throttle * (1f - turnReduction)
+            } else {
+                left = throttle * (1f - turnReduction)
+                right = throttle
+            }
+            return Pair(left, right)
+        }
+
+        // 1. Standstill (Throttle = 0): Must not turn at all regardless of steering
+        val (lStoppedNeutral, rStoppedNeutral) = computeCarMix(0.0f, 0.0f)
+        assertEquals(0.0f, lStoppedNeutral, 0.001f)
+        assertEquals(0.0f, rStoppedNeutral, 0.001f)
+
+        val (lStoppedRight, rStoppedRight) = computeCarMix(0.0f, 1.0f)
+        assertEquals(0.0f, lStoppedRight, 0.001f)
+        assertEquals(0.0f, rStoppedRight, 0.001f)
+
+        val (lStoppedLeft, rStoppedLeft) = computeCarMix(0.0f, -1.0f)
+        assertEquals(0.0f, lStoppedLeft, 0.001f)
+        assertEquals(0.0f, rStoppedLeft, 0.001f)
+
+        // 2. Straight line forward (T = 0.8, S = 0)
+        val (lStraight, rStraight) = computeCarMix(0.8f, 0.0f)
+        assertEquals(0.8f, lStraight, 0.001f)
+        assertEquals(0.8f, rStraight, 0.001f)
+
+        // 3. Gentle Right Turn (T = 0.8, S = 0.5)
+        val (lGentleRight, rGentleRight) = computeCarMix(0.8f, 0.5f)
+        assertEquals(0.8f, lGentleRight, 0.001f)
+        assertEquals(0.4f, rGentleRight, 0.001f)
+
+        // 4. Full Pivot Right Turn (T = 0.8, S = 1.0): Right wheel stops completely
+        val (lHardRight, rHardRight) = computeCarMix(0.8f, 1.0f)
+        assertEquals(0.8f, lHardRight, 0.001f)
+        assertEquals(0.0f, rHardRight, 0.001f)
+
+        // 5. Full Pivot Left Turn (T = 0.8, S = -1.0): Left wheel stops completely
+        val (lHardLeft, rHardLeft) = computeCarMix(0.8f, -1.0f)
+        assertEquals(0.0f, lHardLeft, 0.001f)
+        assertEquals(0.8f, rHardLeft, 0.001f)
+
+        // 6. Reverse Driving (T = -0.6, S = 1.0 -> hard right in reverse)
+        val (lRevRight, rRevRight) = computeCarMix(-0.6f, 1.0f)
+        assertEquals(-0.6f, lRevRight, 0.001f)
+        assertEquals(0.0f, rRevRight, 0.001f)
+
+        // 7. Steering Weight Scaling (e.g. 50% sensitivity: inner wheel only slows down to 50%)
+        val (lHalfSens, rHalfSens) = computeCarMix(1.0f, 1.0f, weightS = 0.5f)
+        assertEquals(1.0f, lHalfSens, 0.001f)
+        assertEquals(0.5f, rHalfSens, 0.001f)
     }
 }

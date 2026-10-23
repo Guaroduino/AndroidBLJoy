@@ -83,11 +83,10 @@ import com.example.androidbljoy.theme.NeonAmber
 import com.example.androidbljoy.theme.NeonGreen
 import com.example.androidbljoy.theme.NeonRed
 import com.example.androidbljoy.theme.OffWhite
-import com.example.androidbljoy.ui.tabs.ControlTab
-import com.example.androidbljoy.ui.tabs.InputsTab
-import com.example.androidbljoy.ui.tabs.MixerTab
-import com.example.androidbljoy.ui.tabs.ModelsTab
-import com.example.androidbljoy.ui.tabs.OutputsTab
+import com.example.androidbljoy.ui.components.DigitalTrimControl
+import com.example.androidbljoy.ui.components.Joystick
+import com.example.androidbljoy.ui.components.TransmitterScreen
+import com.example.androidbljoy.ui.tabs.PressHoldButton
 import kotlinx.coroutines.launch
 
 @Composable
@@ -182,258 +181,53 @@ fun MainScreen(
         modifier = Modifier.fillMaxSize(),
         color = CyberBg
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // TOP BAR: RC Transmitter Header & Navigation Tabs
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(46.dp)
-                    .background(CyberSurface.copy(alpha = 0.95f))
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Left: Bluetooth Status Pill & Quick Connect
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable {
-                            if (connectionStatus != ConnectionStatus.CONNECTED) {
-                                viewModel.scanDevices()
-                                showConnectionDialog = true
-                            }
-                        }
-                        .padding(horizontal = 6.dp, vertical = 4.dp)
-                ) {
-                    val statusColor = when (connectionStatus) {
-                        ConnectionStatus.CONNECTED -> NeonGreen
-                        ConnectionStatus.CONNECTING -> NeonAmber
-                        ConnectionStatus.DISCONNECTED, ConnectionStatus.ERROR -> NeonRed
-                    }
-
-                    val transition = rememberInfiniteTransition(label = "pulse")
-                    val alpha by transition.animateFloat(
-                        initialValue = 0.4f,
-                        targetValue = 1f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(800, easing = LinearEasing),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "alpha"
-                    )
-
-                    val lightAlpha = if (connectionStatus == ConnectionStatus.CONNECTING) alpha else 1f
-
-                    Box(
-                        modifier = Modifier
-                            .size(9.dp)
-                            .alpha(lightAlpha)
-                            .background(statusColor, CircleShape)
-                            .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
-                    )
-
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    val statusText = when (connectionStatus) {
-                        ConnectionStatus.CONNECTED -> connectedDevice?.name ?: "Conectado"
-                        ConnectionStatus.CONNECTING -> "Conectando..."
-                        ConnectionStatus.DISCONNECTED -> "Desconectado"
-                        ConnectionStatus.ERROR -> "Error BLE"
-                    }
-
-                    Text(
-                        text = statusText,
-                        color = OffWhite,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
-                    )
-
-                    if (connectionStatus == ConnectionStatus.CONNECTED) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        val rssiVal = rssi
-                        val rssiText = if (rssiVal != null) "$rssiVal dBm" else "-- dBm"
-                        val rssiColor = when {
-                            rssiVal == null -> MutedText
-                            rssiVal >= -60 -> NeonGreen
-                            rssiVal >= -80 -> NeonAmber
-                            else -> NeonRed
-                        }
-                        Text(
-                            text = rssiText,
-                            color = rssiColor,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(NeonRed.copy(alpha = 0.8f))
-                                .clickable { viewModel.disconnectDevice() }
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text("DESCONECTAR", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-
-                // Test / Simulation Mode Toggle Pill
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(if (isTestMode) NeonGreen.copy(alpha = 0.2f) else CyberSurfaceVariant.copy(alpha = 0.6f))
-                        .border(1.5.dp, if (isTestMode) NeonGreen else MutedText.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
-                        .clickable { viewModel.toggleTestMode() }
-                        .padding(horizontal = 8.dp, vertical = 5.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "🧪 Modo Prueba: ",
-                            color = OffWhite,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = if (isTestMode) "ACTIVADO" else "DESACTIVADO",
-                            color = if (isTestMode) NeonGreen else NeonRed,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Black
-                        )
-                    }
-                }
-
-                // Center: Model Quick-Picker Pill
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(CyberSurfaceVariant.copy(alpha = 0.6f))
-                        .clickable { showModelPickerQuickDialog = true }
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "MODELO: ",
-                            color = MutedText,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = activeModel.name,
-                            color = CyberPrimary,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "▼",
-                            color = CyberPrimary,
-                            fontSize = 8.sp
-                        )
-                    }
-                }
-
-                // Settings Icon (Dedicated easy touch button)
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(CyberSurfaceVariant)
-                        .border(1.dp, CyberPrimary.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                        .clickable { showSettingsDialog = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Ajustes",
-                        tint = CyberPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                // Right: 5 Tabs Navigation
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.padding(end = 12.dp)
-                ) {
-                    val tabs = listOf(
-                        "🕹️ Control",
-                        "🎮 Inputs",
-                        "🔀 Mixer",
-                        "⚡ Outputs",
-                        "📁 Modelos"
-                    )
-
-                    tabs.forEachIndexed { index, title ->
-                        val isSelected = (selectedTabIndex == index)
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (isSelected) CyberPrimary else Color.Transparent)
-                                .clickable { selectedTabIndex = index }
-                                .padding(horizontal = 8.dp, vertical = 5.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = title,
-                                color = if (isSelected) Color.Black else OffWhite,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Auto-load Notification Banner (Model Match Feedback)
-            if (autoLoadNotification != null) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(NeonGreen.copy(alpha = 0.15f))
-                        .border(1.dp, NeonGreen.copy(alpha = 0.4f))
-                        .padding(horizontal = 12.dp, vertical = 3.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "✓ $autoLoadNotification",
-                        color = NeonGreen,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    IconButton(
-                        onClick = { viewModel.clearAutoLoadNotification() },
-                        modifier = Modifier.size(18.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = "Cerrar",
-                            tint = NeonGreen,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
-            }
-
-            // Tab Body Container
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // LEFT GIMBAL (Stick 1 + Trims)
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
+                    .weight(1.3f)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.Center
             ) {
-                when (selectedTabIndex) {
-                    0 -> ControlTab(viewModel)
-                    1 -> InputsTab(viewModel)
-                    2 -> MixerTab(viewModel)
-                    3 -> OutputsTab(viewModel)
-                    4 -> ModelsTab(viewModel)
-                }
+                LeftGimbalContent(viewModel = viewModel)
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // CENTER: RC Transmitter Embedded LCD Screen
+            Box(
+                modifier = Modifier
+                    .weight(1.75f)
+                    .fillMaxHeight()
+            ) {
+                TransmitterScreen(
+                    viewModel = viewModel,
+                    selectedTabIndex = selectedTabIndex,
+                    onTabSelected = { selectedTabIndex = it },
+                    onOpenModelPicker = { showModelPickerQuickDialog = true },
+                    onOpenConnection = {
+                        viewModel.scanDevices()
+                        showConnectionDialog = true
+                    },
+                    onOpenSettings = { showSettingsDialog = true }
+                )
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // RIGHT GIMBAL (Stick 2 + Trims)
+            Box(
+                modifier = Modifier
+                    .weight(1.3f)
+                    .fillMaxHeight(),
+                contentAlignment = Alignment.Center
+            ) {
+                RightGimbalContent(viewModel = viewModel)
             }
         }
     }
@@ -1009,6 +803,453 @@ fun DeviceItem(
                 color = MutedText,
                 fontSize = 9.sp,
                 fontFamily = FontFamily.Monospace
+            )
+        }
+    }
+}
+
+@Composable
+private fun LeftGimbalContent(
+    viewModel: MainScreenViewModel,
+    modifier: Modifier = Modifier
+) {
+    val activeModel by viewModel.activeModel.collectAsStateWithLifecycle()
+    val tractionVal by viewModel.tractionValue.collectAsStateWithLifecycle()
+    val steeringVal by viewModel.steeringValue.collectAsStateWithLifecycle()
+    val tractionTrimLocked by viewModel.tractionTrimLocked.collectAsStateWithLifecycle()
+    val steeringTrimLocked by viewModel.steeringTrimLocked.collectAsStateWithLifecycle()
+
+    val swapJoysticks = activeModel.inputs.swapJoysticks
+    val unifiedJoystick = activeModel.inputs.unifiedJoystick
+    val drivingMode = activeModel.vehicleType
+    val tractionTrim = activeModel.inputs.tractionTrim
+    val steeringTrim = activeModel.inputs.steeringTrim
+
+    Column(
+        modifier = modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        if (!swapJoysticks) {
+            // LEFT = Stick 1 (Traction / Primary)
+            if (unifiedJoystick && drivingMode != DrivingMode.TANK) {
+                // Unified Joystick on Left Stick
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Joystick(
+                        name = "STICK 1 (2D)",
+                        joystickSize = 175.dp,
+                        isVerticalOnly = false,
+                        isHorizontalOnly = false,
+                        externalX = steeringVal,
+                        externalY = tractionVal,
+                        onValueChanged = { x, y ->
+                            viewModel.updateSteering(x)
+                            viewModel.updateTraction(y)
+                        }
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    DigitalTrimControl(
+                        trimValue = tractionTrim,
+                        isLocked = tractionTrimLocked,
+                        onTrimChange = { viewModel.setTractionTrim(it) },
+                        onToggleLock = { viewModel.toggleTractionTrimLock() },
+                        isVertical = true,
+                        label = "T-TRIM"
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                DigitalTrimControl(
+                    trimValue = steeringTrim,
+                    isLocked = steeringTrimLocked,
+                    onTrimChange = { viewModel.setSteeringTrim(it) },
+                    onToggleLock = { viewModel.toggleSteeringTrimLock() },
+                    isVertical = false,
+                    label = "S-TRIM"
+                )
+            } else {
+                // Normal or Tank Mode
+                val tractionIsVertical = activeModel.inputs.tractionAxisVertical
+                val label = if (drivingMode == DrivingMode.TANK) {
+                    if (tractionIsVertical) "ORUGA IZQ (Y)" else "ORUGA IZQ (X)"
+                } else {
+                    if (tractionIsVertical) "TRACCIÓN (Y)" else "TRACCIÓN (X)"
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Joystick(
+                        name = label,
+                        joystickSize = 180.dp,
+                        isVerticalOnly = tractionIsVertical,
+                        isHorizontalOnly = !tractionIsVertical,
+                        externalX = if (!tractionIsVertical) tractionVal else null,
+                        externalY = if (tractionIsVertical) tractionVal else null,
+                        onValueChanged = { x, y ->
+                            if (tractionIsVertical) viewModel.updateTraction(y) else viewModel.updateTraction(x)
+                        }
+                    )
+                    if (tractionIsVertical) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        DigitalTrimControl(
+                            trimValue = tractionTrim,
+                            isLocked = tractionTrimLocked,
+                            onTrimChange = { viewModel.setTractionTrim(it) },
+                            onToggleLock = { viewModel.toggleTractionTrimLock() },
+                            isVertical = true,
+                            label = "T-TRIM"
+                        )
+                    }
+                }
+
+                if (!tractionIsVertical) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    DigitalTrimControl(
+                        trimValue = tractionTrim,
+                        isLocked = tractionTrimLocked,
+                        onTrimChange = { viewModel.setTractionTrim(it) },
+                        onToggleLock = { viewModel.toggleTractionTrimLock() },
+                        isVertical = false,
+                        label = "T-TRIM"
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Substantial bench control buttons
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    PressHoldButton(
+                        text = if (tractionIsVertical) "▲ Gas" else "Gas ▶",
+                        modifier = Modifier.width(82.dp).height(38.dp),
+                        onPressed = { viewModel.updateTraction(1.0f) },
+                        onReleased = { viewModel.updateTraction(0f) }
+                    )
+                    PressHoldButton(
+                        text = if (tractionIsVertical) "▼ Rev" else "◀ Rev",
+                        modifier = Modifier.width(82.dp).height(38.dp),
+                        onPressed = { viewModel.updateTraction(-1.0f) },
+                        onReleased = { viewModel.updateTraction(0f) }
+                    )
+                }
+            }
+        } else {
+            // SWAPPED: Left stick is Steering (or Right Track in Tank)
+            if (unifiedJoystick && drivingMode != DrivingMode.TANK) {
+                InactiveGimbalWell(title = "GIMBAL 1", subtitle = "Mando Unificado en Gimbal 2")
+            } else {
+                val steeringIsHorizontal = if (drivingMode == DrivingMode.TANK) false else activeModel.inputs.steeringAxisHorizontal
+                val label = if (drivingMode == DrivingMode.TANK) {
+                    "ORUGA DER (Y)"
+                } else {
+                    if (steeringIsHorizontal) "DIRECCIÓN (X)" else "DIRECCIÓN (Y)"
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Joystick(
+                        name = label,
+                        joystickSize = 180.dp,
+                        isVerticalOnly = !steeringIsHorizontal,
+                        isHorizontalOnly = steeringIsHorizontal,
+                        externalX = if (steeringIsHorizontal) steeringVal else null,
+                        externalY = if (!steeringIsHorizontal) steeringVal else null,
+                        onValueChanged = { x, y ->
+                            if (steeringIsHorizontal) viewModel.updateSteering(x) else viewModel.updateSteering(y)
+                        }
+                    )
+                    if (!steeringIsHorizontal) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        DigitalTrimControl(
+                            trimValue = steeringTrim,
+                            isLocked = steeringTrimLocked,
+                            onTrimChange = { viewModel.setSteeringTrim(it) },
+                            onToggleLock = { viewModel.toggleSteeringTrimLock() },
+                            isVertical = true,
+                            label = "S-TRIM"
+                        )
+                    }
+                }
+
+                if (steeringIsHorizontal) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    DigitalTrimControl(
+                        trimValue = steeringTrim,
+                        isLocked = steeringTrimLocked,
+                        onTrimChange = { viewModel.setSteeringTrim(it) },
+                        onToggleLock = { viewModel.toggleSteeringTrimLock() },
+                        isVertical = false,
+                        label = "S-TRIM"
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    PressHoldButton(
+                        text = "◀ Izq",
+                        modifier = Modifier.width(82.dp).height(38.dp),
+                        onPressed = { viewModel.updateSteering(-1.0f) },
+                        onReleased = { viewModel.updateSteering(0f) }
+                    )
+                    PressHoldButton(
+                        text = "Der ▶",
+                        modifier = Modifier.width(82.dp).height(38.dp),
+                        onPressed = { viewModel.updateSteering(1.0f) },
+                        onReleased = { viewModel.updateSteering(0f) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RightGimbalContent(
+    viewModel: MainScreenViewModel,
+    modifier: Modifier = Modifier
+) {
+    val activeModel by viewModel.activeModel.collectAsStateWithLifecycle()
+    val tractionVal by viewModel.tractionValue.collectAsStateWithLifecycle()
+    val steeringVal by viewModel.steeringValue.collectAsStateWithLifecycle()
+    val tractionTrimLocked by viewModel.tractionTrimLocked.collectAsStateWithLifecycle()
+    val steeringTrimLocked by viewModel.steeringTrimLocked.collectAsStateWithLifecycle()
+
+    val swapJoysticks = activeModel.inputs.swapJoysticks
+    val unifiedJoystick = activeModel.inputs.unifiedJoystick
+    val drivingMode = activeModel.vehicleType
+    val tractionTrim = activeModel.inputs.tractionTrim
+    val steeringTrim = activeModel.inputs.steeringTrim
+
+    Column(
+        modifier = modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        if (!swapJoysticks) {
+            // NORMAL: Right stick is Steering (or Right Track in Tank)
+            if (unifiedJoystick && drivingMode != DrivingMode.TANK) {
+                InactiveGimbalWell(title = "GIMBAL 2", subtitle = "Mando Unificado en Gimbal 1")
+            } else {
+                val steeringIsHorizontal = if (drivingMode == DrivingMode.TANK) false else activeModel.inputs.steeringAxisHorizontal
+                val label = if (drivingMode == DrivingMode.TANK) {
+                    "ORUGA DER (Y)"
+                } else {
+                    if (steeringIsHorizontal) "DIRECCIÓN (X)" else "DIRECCIÓN (Y)"
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    if (!steeringIsHorizontal) {
+                        DigitalTrimControl(
+                            trimValue = steeringTrim,
+                            isLocked = steeringTrimLocked,
+                            onTrimChange = { viewModel.setSteeringTrim(it) },
+                            onToggleLock = { viewModel.toggleSteeringTrimLock() },
+                            isVertical = true,
+                            label = "S-TRIM"
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Joystick(
+                        name = label,
+                        joystickSize = 180.dp,
+                        isVerticalOnly = !steeringIsHorizontal,
+                        isHorizontalOnly = steeringIsHorizontal,
+                        externalX = if (steeringIsHorizontal) steeringVal else null,
+                        externalY = if (!steeringIsHorizontal) steeringVal else null,
+                        onValueChanged = { x, y ->
+                            if (steeringIsHorizontal) viewModel.updateSteering(x) else viewModel.updateSteering(y)
+                        }
+                    )
+                }
+
+                if (steeringIsHorizontal) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    DigitalTrimControl(
+                        trimValue = steeringTrim,
+                        isLocked = steeringTrimLocked,
+                        onTrimChange = { viewModel.setSteeringTrim(it) },
+                        onToggleLock = { viewModel.toggleSteeringTrimLock() },
+                        isVertical = false,
+                        label = "S-TRIM"
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    PressHoldButton(
+                        text = "◀ Izq",
+                        modifier = Modifier.width(82.dp).height(38.dp),
+                        onPressed = { viewModel.updateSteering(-1.0f) },
+                        onReleased = { viewModel.updateSteering(0f) }
+                    )
+                    PressHoldButton(
+                        text = "Der ▶",
+                        modifier = Modifier.width(82.dp).height(38.dp),
+                        onPressed = { viewModel.updateSteering(1.0f) },
+                        onReleased = { viewModel.updateSteering(0f) }
+                    )
+                }
+            }
+        } else {
+            // SWAPPED: Right stick is Traction (or Left Track in Tank)
+            if (unifiedJoystick && drivingMode != DrivingMode.TANK) {
+                // Unified Joystick on Right Stick
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    DigitalTrimControl(
+                        trimValue = tractionTrim,
+                        isLocked = tractionTrimLocked,
+                        onTrimChange = { viewModel.setTractionTrim(it) },
+                        onToggleLock = { viewModel.toggleTractionTrimLock() },
+                        isVertical = true,
+                        label = "T-TRIM"
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Joystick(
+                        name = "STICK 2 (2D)",
+                        joystickSize = 175.dp,
+                        isVerticalOnly = false,
+                        isHorizontalOnly = false,
+                        externalX = steeringVal,
+                        externalY = tractionVal,
+                        onValueChanged = { x, y ->
+                            viewModel.updateSteering(x)
+                            viewModel.updateTraction(y)
+                        }
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                DigitalTrimControl(
+                    trimValue = steeringTrim,
+                    isLocked = steeringTrimLocked,
+                    onTrimChange = { viewModel.setSteeringTrim(it) },
+                    onToggleLock = { viewModel.toggleSteeringTrimLock() },
+                    isVertical = false,
+                    label = "S-TRIM"
+                )
+            } else {
+                val tractionIsVertical = activeModel.inputs.tractionAxisVertical
+                val label = if (drivingMode == DrivingMode.TANK) {
+                    if (tractionIsVertical) "ORUGA IZQ (Y)" else "ORUGA IZQ (X)"
+                } else {
+                    if (tractionIsVertical) "TRACCIÓN (Y)" else "TRACCIÓN (X)"
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    if (tractionIsVertical) {
+                        DigitalTrimControl(
+                            trimValue = tractionTrim,
+                            isLocked = tractionTrimLocked,
+                            onTrimChange = { viewModel.setTractionTrim(it) },
+                            onToggleLock = { viewModel.toggleTractionTrimLock() },
+                            isVertical = true,
+                            label = "T-TRIM"
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Joystick(
+                        name = label,
+                        joystickSize = 180.dp,
+                        isVerticalOnly = tractionIsVertical,
+                        isHorizontalOnly = !tractionIsVertical,
+                        externalX = if (!tractionIsVertical) tractionVal else null,
+                        externalY = if (tractionIsVertical) tractionVal else null,
+                        onValueChanged = { x, y ->
+                            if (tractionIsVertical) viewModel.updateTraction(y) else viewModel.updateTraction(x)
+                        }
+                    )
+                }
+
+                if (!tractionIsVertical) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    DigitalTrimControl(
+                        trimValue = tractionTrim,
+                        isLocked = tractionTrimLocked,
+                        onTrimChange = { viewModel.setTractionTrim(it) },
+                        onToggleLock = { viewModel.toggleTractionTrimLock() },
+                        isVertical = false,
+                        label = "T-TRIM"
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    PressHoldButton(
+                        text = if (tractionIsVertical) "▲ Gas" else "Gas ▶",
+                        modifier = Modifier.width(82.dp).height(38.dp),
+                        onPressed = { viewModel.updateTraction(1.0f) },
+                        onReleased = { viewModel.updateTraction(0f) }
+                    )
+                    PressHoldButton(
+                        text = if (tractionIsVertical) "▼ Rev" else "◀ Rev",
+                        modifier = Modifier.width(82.dp).height(38.dp),
+                        onPressed = { viewModel.updateTraction(-1.0f) },
+                        onReleased = { viewModel.updateTraction(0f) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InactiveGimbalWell(
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(180.dp)
+            .background(CyberSurfaceVariant.copy(alpha = 0.2f), CircleShape)
+            .border(1.dp, MutedText.copy(alpha = 0.25f), CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = title,
+                color = MutedText,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = subtitle,
+                color = MutedText.copy(alpha = 0.6f),
+                fontSize = 10.sp,
+                textAlign = TextAlign.Center
             )
         }
     }
