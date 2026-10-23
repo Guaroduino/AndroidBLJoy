@@ -1,7 +1,7 @@
 {
-  "versionCode": 24,
-  "versionName": "1.23",
+  "versionCode": 25,
+  "versionName": "1.24",
   "apkUrl": "https://storage.googleapis.com/androidblejoy.firebasestorage.app/updates/app-debug.apk",
-  "releaseNotes": "Joysticks mas grandes (180dp), botones de control tactiles de 82x38dp con respuesta continua garantizada y feedback visual activo, y botones de trim digital ampliados a 32dp",
+  "releaseNotes": "v1.24: Integracion de pantalla LCD embebida TransmitterScreen, controles de trim digital de 32dp, botones tactiles continuos de 82x38dp, joysticks de 180dp, tema Carbon & LCD (chasis fibra de carbono y gimbals TX16S) y avisos directos de Ubicacion/Bluetooth en escaner BLE.",
   "forceUpdate": false
 }

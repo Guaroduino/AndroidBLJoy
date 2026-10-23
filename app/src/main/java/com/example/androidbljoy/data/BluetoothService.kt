@@ -12,6 +12,7 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
+import android.location.LocationManager
 import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
@@ -217,9 +218,24 @@ class BluetoothService private constructor(private val context: Context) {
         }
     }
 
+    fun isBluetoothEnabled(): Boolean {
+        return bluetoothAdapter?.isEnabled == true
+    }
+
+    fun isLocationEnabled(): Boolean {
+        val locationManager =
+            context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return false
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            locationManager.isLocationEnabled
+        } else {
+            locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        }
+    }
+
     @SuppressLint("MissingPermission")
     fun refreshPairedDevices() {
-        if (!hasPermissions() || bluetoothAdapter == null) return
+        if (!hasPermissions() || bluetoothAdapter == null || !isBluetoothEnabled()) return
         val devices = bluetoothAdapter.bondedDevices.map {
             BluetoothDeviceInfo(it.name ?: "Dispositivo Desconocido", it.address)
         }
@@ -228,10 +244,14 @@ class BluetoothService private constructor(private val context: Context) {
 
     @SuppressLint("MissingPermission")
     fun startScanning() {
-        if (!hasPermissions() || bluetoothAdapter == null) return
+        if (!hasPermissions() || bluetoothAdapter == null || !isBluetoothEnabled() || !isLocationEnabled()) {
+            _isScanning.value = false
+            return
+        }
         val scanner = bluetoothAdapter.bluetoothLeScanner
         if (scanner == null) {
             Log.e(TAG, "BLE scanner is null (is Bluetooth disabled?)")
+            _isScanning.value = false
             return
         }
 

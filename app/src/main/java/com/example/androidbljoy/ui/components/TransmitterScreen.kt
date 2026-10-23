@@ -43,11 +43,16 @@ import com.example.androidbljoy.theme.CyberBg
 import com.example.androidbljoy.theme.CyberPrimary
 import com.example.androidbljoy.theme.CyberSurface
 import com.example.androidbljoy.theme.CyberSurfaceVariant
+import com.example.androidbljoy.theme.LcdBezelOuter
+import com.example.androidbljoy.theme.LcdInk
+import com.example.androidbljoy.theme.LcdInkSecondary
+import com.example.androidbljoy.theme.LcdScreenBg
 import com.example.androidbljoy.theme.MutedText
 import com.example.androidbljoy.theme.NeonAmber
 import com.example.androidbljoy.theme.NeonGreen
 import com.example.androidbljoy.theme.NeonRed
 import com.example.androidbljoy.theme.OffWhite
+import com.example.androidbljoy.theme.isCarbonLcdTheme
 import com.example.androidbljoy.ui.main.MainScreenViewModel
 import com.example.androidbljoy.ui.tabs.InputsTab
 import com.example.androidbljoy.ui.tabs.MixerTab
@@ -319,10 +324,18 @@ fun TransmitterScreen(
                                     .fillMaxWidth()
                                     .weight(1f)
                             )
+                            val lcdMode = isCarbonLcdTheme
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(4.dp))
+                                    .background(
+                                        if (lcdMode) LcdScreenBg else Color.Black.copy(alpha = 0.85f),
+                                        RoundedCornerShape(4.dp)
+                                    )
+                                    .then(
+                                        if (lcdMode) Modifier.border(1.5.dp, LcdBezelOuter, RoundedCornerShape(4.dp))
+                                        else Modifier
+                                    )
                                     .padding(horizontal = 6.dp, vertical = 2.dp),
                                 contentAlignment = Alignment.CenterStart
                             ) {
@@ -333,16 +346,17 @@ fun TransmitterScreen(
                                 ) {
                                     Text(
                                         text = "GATT: $lastSentMessage",
-                                        color = CyberPrimary,
+                                        color = if (lcdMode) LcdInk else CyberPrimary,
                                         fontFamily = FontFamily.Monospace,
                                         fontSize = 8.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
                                         text = "M1:$motorA M2:$motorB S:$servoAngle°",
-                                        color = OffWhite.copy(alpha = 0.7f),
+                                        color = if (lcdMode) LcdInkSecondary else OffWhite.copy(alpha = 0.7f),
                                         fontFamily = FontFamily.Monospace,
-                                        fontSize = 8.sp
+                                        fontSize = 8.sp,
+                                        fontWeight = if (lcdMode) FontWeight.Bold else FontWeight.Normal
                                     )
                                 }
                             }

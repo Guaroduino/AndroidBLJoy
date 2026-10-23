@@ -49,9 +49,14 @@ import com.example.androidbljoy.data.model.DrivingMode
 import com.example.androidbljoy.theme.CyberPrimary
 import com.example.androidbljoy.theme.CyberSecondary
 import com.example.androidbljoy.theme.CyberSurfaceVariant
+import com.example.androidbljoy.theme.LcdBezelOuter
+import com.example.androidbljoy.theme.LcdInk
+import com.example.androidbljoy.theme.LcdInkSecondary
+import com.example.androidbljoy.theme.LcdScreenBg
 import com.example.androidbljoy.theme.MutedText
 import com.example.androidbljoy.theme.NeonRed
 import com.example.androidbljoy.theme.OffWhite
+import com.example.androidbljoy.theme.isCarbonLcdTheme
 import com.example.androidbljoy.ui.components.Joystick
 import com.example.androidbljoy.ui.components.VehicleVisualizer
 import com.example.androidbljoy.ui.main.MainScreenViewModel
@@ -478,10 +483,21 @@ fun ControlTab(
             Spacer(modifier = Modifier.height(6.dp))
 
             // GATT Stream Output Bar
+            val lcdMode = isCarbonLcdTheme
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(8.dp))
+                    .background(
+                        if (lcdMode) LcdScreenBg else Color.Black.copy(alpha = 0.8f),
+                        RoundedCornerShape(if (lcdMode) 6.dp else 8.dp)
+                    )
+                    .then(
+                        if (lcdMode) {
+                            Modifier.border(2.5.dp, LcdBezelOuter, RoundedCornerShape(6.dp))
+                        } else {
+                            Modifier
+                        }
+                    )
                     .padding(horizontal = 8.dp, vertical = 4.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
@@ -492,16 +508,17 @@ fun ControlTab(
                 ) {
                     Text(
                         text = "GATT: $lastSentMessage",
-                        color = CyberSecondary,
+                        color = if (lcdMode) LcdInk else CyberSecondary,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "CH1:${(tractionVal * 100).toInt()}% CH2:${(steeringVal * 100).toInt()}%",
-                        color = OffWhite.copy(alpha = 0.7f),
+                        color = if (lcdMode) LcdInkSecondary else OffWhite.copy(alpha = 0.7f),
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 9.sp
+                        fontSize = 9.sp,
+                        fontWeight = if (lcdMode) FontWeight.Bold else FontWeight.Normal
                     )
                 }
             }
@@ -525,17 +542,26 @@ fun PressHoldButton(
     onReleased: () -> Unit
 ) {
     var isPressed by remember { mutableStateOf(false) }
+    val carbonMode = isCarbonLcdTheme
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(if (carbonMode) 6.dp else 8.dp))
             .background(
-                if (isPressed) activeColor.copy(alpha = 0.35f) else CyberSurfaceVariant.copy(alpha = 0.85f)
+                when {
+                    isPressed -> activeColor.copy(alpha = 0.35f)
+                    carbonMode -> Color(0xFF101215)
+                    else -> CyberSurfaceVariant.copy(alpha = 0.85f)
+                }
             )
             .border(
                 1.5.dp,
-                if (isPressed) activeColor else CyberSurfaceVariant,
-                RoundedCornerShape(8.dp)
+                when {
+                    isPressed -> activeColor
+                    carbonMode -> Color(0xFF3E4550)
+                    else -> CyberSurfaceVariant
+                },
+                RoundedCornerShape(if (carbonMode) 6.dp else 8.dp)
             )
             .pointerInput(Unit) {
                 awaitEachGesture {
