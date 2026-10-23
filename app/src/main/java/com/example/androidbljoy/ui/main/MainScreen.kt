@@ -1,6 +1,9 @@
 package com.example.androidbljoy.ui.main
 
+import android.bluetooth.BluetoothAdapter
+import android.content.Intent
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.LinearEasing
@@ -45,6 +48,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -64,6 +68,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavKey
 import com.example.androidbljoy.AppTheme
@@ -83,6 +90,7 @@ import com.example.androidbljoy.theme.NeonAmber
 import com.example.androidbljoy.theme.NeonGreen
 import com.example.androidbljoy.theme.NeonRed
 import com.example.androidbljoy.theme.OffWhite
+import com.example.androidbljoy.ui.components.carbonFiberBackground
 import com.example.androidbljoy.ui.tabs.ControlTab
 import com.example.androidbljoy.ui.tabs.InputsTab
 import com.example.androidbljoy.ui.tabs.MixerTab
@@ -97,22 +105,11 @@ fun MainScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current.applicationContext
-    var hasPermissions by remember { mutableStateOf(false) }
+    val activityContext = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions(),
-        onResult = { permissionsMap ->
-            val allGranted = permissionsMap.values.all { it }
-            hasPermissions = allGranted
-            if (allGranted) {
-                viewModel.scanDevices()
-            }
-        }
-    )
-
-    // Check permissions on startup
-    LaunchedEffect(Unit) {
-        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    val requiredPermissions = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             arrayOf(
                 android.Manifest.permission.BLUETOOTH_SCAN,
                 android.Manifest.permission.BLUETOOTH_CONNECT,
@@ -125,23 +122,90 @@ fun MainScreen(
                 android.Manifest.permission.ACCESS_COARSE_LOCATION
             )
         }
-
-        val allGranted = permissions.all {
-            context.checkSelfPermission(it) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        }
-
-        hasPermissions = allGranted
-        if (!allGranted) {
-            permissionLauncher.launch(permissions)
-        } else {
-            viewModel.scanDevices()
-        }
     }
+
+    var hasPermissions by remember { mutableStateOf(viewModel.bluetoothService.hasPermissions()) }
+    var isBluetoothEnabled by remember { mutableStateOf(viewModel.bluetoothService.isBluetoothEnabled()) }
+    var isLocationEnabled by remember { mutableStateOf(viewModel.bluetoothService.isLocationEnabled()) }
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     var showConnectionDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showModelPickerQuickDialog by remember { mutableStateOf(false) }
+
+    fun refreshSystemStatesAndScanIfNeeded() {
+        hasPermissions = viewModel.bluetoothService.hasPermissions()
+        isBluetoothEnabled = viewModel.bluetoothService.isBluetoothEnabled()
+        isLocationEnabled = viewModel.bluetoothService.isLocationEnabled()
+        if (hasPermissions && isBluetoothEnabled && isLocationEnabled) {
+            viewModel.scanDevices()
+        }
+    }
+
+    val enableBluetoothLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = {
+            refreshSystemStatesAndScanIfNeeded()
+        }
+    )
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = { permissionsMap ->
+            val allGranted = permissionsMap.values.all { it }
+            hasPermissions = allGranted
+            isBluetoothEnabled = viewModel.bluetoothService.isBluetoothEnabled()
+            isLocationEnabled = viewModel.bluetoothService.isLocationEnabled()
+            if (allGranted) {
+                if (!isBluetoothEnabled || !isLocationEnabled) {
+                    showConnectionDialog = true
+                } else {
+                    viewModel.scanDevices()
+                }
+            }
+        }
+    )
+
+    // Automatically refresh states when user returns from Location/Bluetooth settings
+    DisposableEffect(lifecycleOwner, showConnectionDialog) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val prevLoc = isLocationEnabled
+                val prevBt = isBluetoothEnabled
+                hasPermissions = viewModel.bluetoothService.hasPermissions()
+                isBluetoothEnabled = viewModel.bluetoothService.isBluetoothEnabled()
+                isLocationEnabled = viewModel.bluetoothService.isLocationEnabled()
+                if (hasPermissions && isBluetoothEnabled && isLocationEnabled &&
+                    (showConnectionDialog || !prevLoc || !prevBt)
+                ) {
+                    viewModel.scanDevices()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // Check permissions & Location/Bluetooth on startup
+    LaunchedEffect(Unit) {
+        val allGranted = requiredPermissions.all {
+            context.checkSelfPermission(it) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+
+        hasPermissions = allGranted
+        isBluetoothEnabled = viewModel.bluetoothService.isBluetoothEnabled()
+        isLocationEnabled = viewModel.bluetoothService.isLocationEnabled()
+
+        if (!allGranted) {
+            permissionLauncher.launch(requiredPermissions)
+        } else if (!isBluetoothEnabled || !isLocationEnabled) {
+            showConnectionDialog = true
+        } else {
+            viewModel.scanDevices()
+        }
+    }
 
     // Update Manager state
     val updateManager = remember { UpdateManager(context) }
@@ -182,7 +246,11 @@ fun MainScreen(
         modifier = Modifier.fillMaxSize(),
         color = CyberBg
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .carbonFiberBackground()
+        ) {
             // TOP BAR: RC Transmitter Header & Navigation Tabs
             Row(
                 modifier = Modifier
@@ -201,7 +269,7 @@ fun MainScreen(
                         .clip(RoundedCornerShape(6.dp))
                         .clickable {
                             if (connectionStatus != ConnectionStatus.CONNECTED) {
-                                viewModel.scanDevices()
+                                refreshSystemStatesAndScanIfNeeded()
                                 showConnectionDialog = true
                             }
                         }
@@ -553,7 +621,7 @@ fun MainScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                             }
-                            IconButton(onClick = { viewModel.scanDevices() }) {
+                            IconButton(onClick = { refreshSystemStatesAndScanIfNeeded() }) {
                                 Icon(
                                     imageVector = Icons.Default.Refresh,
                                     contentDescription = "Refrescar",
@@ -566,16 +634,117 @@ fun MainScreen(
                     Spacer(modifier = Modifier.height(6.dp))
 
                     if (!hasPermissions) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = "Permisos de Bluetooth y Ubicación requeridos.",
+                                text = "⚠️ Permisos Requeridos",
                                 color = NeonRed,
-                                textAlign = TextAlign.Center,
-                                fontSize = 12.sp
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
                             )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Se requieren permisos de Dispositivos Cercanos (Bluetooth) y Ubicación Precisa para buscar el robot ESP32.",
+                                color = OffWhite,
+                                textAlign = TextAlign.Center,
+                                fontSize = 11.sp
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Button(
+                                onClick = { permissionLauncher.launch(requiredPermissions) },
+                                colors = ButtonDefaults.buttonColors(containerColor = CyberPrimary),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "Conceder Permisos",
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    } else if (!isBluetoothEnabled) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "⚠️ Bluetooth Desactivado",
+                                color = NeonAmber,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "El Bluetooth de tu teléfono está apagado. Actívalo para poder buscar y conectar con el robot.",
+                                color = OffWhite,
+                                textAlign = TextAlign.Center,
+                                fontSize = 11.sp
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Button(
+                                onClick = {
+                                    try {
+                                        enableBluetoothLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+                                    } catch (e: Exception) {
+                                        activityContext.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonAmber),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "Activar Bluetooth",
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    } else if (!isLocationEnabled) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "📍 Ubicación (GPS) Desactivada",
+                                color = NeonAmber,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Android exige que la Ubicación (GPS) del teléfono esté activada para poder escanear dispositivos Bluetooth BLE cercanos.",
+                                color = OffWhite,
+                                textAlign = TextAlign.Center,
+                                fontSize = 11.sp
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Button(
+                                onClick = {
+                                    activityContext.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonAmber),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = "Activar Ubicación (GPS)",
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
                     } else {
                         Row(
@@ -713,7 +882,7 @@ fun MainScreen(
                             )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 val activeTheme = MainActivity.appThemeState.value
 
@@ -721,8 +890,25 @@ fun MainScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .clip(RoundedCornerShape(6.dp))
+                                        .background(if (activeTheme == AppTheme.CARBON_LCD) CyberPrimary else CyberSurfaceVariant)
+                                        .clickable { MainActivity.setTheme(context, AppTheme.CARBON_LCD) }
+                                        .padding(vertical = 6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "Carbon & LCD",
+                                        color = if (activeTheme == AppTheme.CARBON_LCD) Color.Black else OffWhite,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 10.sp
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(6.dp))
                                         .background(if (activeTheme == AppTheme.CYBERPUNK) CyberPrimary else CyberSurfaceVariant)
-                                        .clickable { MainActivity.appThemeState.value = AppTheme.CYBERPUNK }
+                                        .clickable { MainActivity.setTheme(context, AppTheme.CYBERPUNK) }
                                         .padding(vertical = 6.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -739,7 +925,7 @@ fun MainScreen(
                                         .weight(1f)
                                         .clip(RoundedCornerShape(6.dp))
                                         .background(if (activeTheme == AppTheme.RETRO_AMBER) CyberPrimary else CyberSurfaceVariant)
-                                        .clickable { MainActivity.appThemeState.value = AppTheme.RETRO_AMBER }
+                                        .clickable { MainActivity.setTheme(context, AppTheme.RETRO_AMBER) }
                                         .padding(vertical = 6.dp),
                                     contentAlignment = Alignment.Center
                                 ) {

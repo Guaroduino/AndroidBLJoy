@@ -1,9 +1,9 @@
 package com.example.androidbljoy
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -25,7 +25,8 @@ import com.example.androidbljoy.ui.main.MainScreenViewModel
 
 enum class AppTheme {
   CYBERPUNK,
-  RETRO_AMBER
+  RETRO_AMBER,
+  CARBON_LCD
 }
 
 class MainActivity : ComponentActivity() {
@@ -43,11 +44,33 @@ class MainActivity : ComponentActivity() {
   }
 
   companion object {
-    val appThemeState = androidx.compose.runtime.mutableStateOf(AppTheme.CYBERPUNK)
+    private const val PREFS_NAME = "bljoy_theme_prefs"
+    private const val KEY_THEME = "selected_theme"
+    val appThemeState = androidx.compose.runtime.mutableStateOf(AppTheme.CARBON_LCD)
+
+    fun setTheme(context: Context, theme: AppTheme) {
+      appThemeState.value = theme
+      context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+          .edit()
+          .putString(KEY_THEME, theme.name)
+          .apply()
+    }
+
+    fun loadTheme(context: Context) {
+      val saved = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+          .getString(KEY_THEME, AppTheme.CARBON_LCD.name)
+      val theme = try {
+        AppTheme.valueOf(saved ?: AppTheme.CARBON_LCD.name)
+      } catch (_: Exception) {
+        AppTheme.CARBON_LCD
+      }
+      appThemeState.value = theme
+    }
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    loadTheme(this)
     bluetoothService = BluetoothService.getInstance(this)
 
     // Keep screen on while controlling/testing

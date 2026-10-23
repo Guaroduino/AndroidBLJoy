@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -27,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -41,15 +41,51 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.androidbljoy.data.model.DrivingMode
 import com.example.androidbljoy.theme.CyberPrimary
-import com.example.androidbljoy.theme.CyberSecondary
 import com.example.androidbljoy.theme.CyberSurface
 import com.example.androidbljoy.theme.CyberSurfaceVariant
+import com.example.androidbljoy.theme.LcdBezelInner
+import com.example.androidbljoy.theme.LcdBezelOuter
+import com.example.androidbljoy.theme.LcdGhostSegment
+import com.example.androidbljoy.theme.LcdInk
+import com.example.androidbljoy.theme.LcdInkSecondary
+import com.example.androidbljoy.theme.LcdPixelGrid
+import com.example.androidbljoy.theme.LcdScreenBg
+import com.example.androidbljoy.theme.LcdScreenBgInner
 import com.example.androidbljoy.theme.MutedText
 import com.example.androidbljoy.theme.NeonAmber
 import com.example.androidbljoy.theme.NeonGreen
 import com.example.androidbljoy.theme.NeonRed
 import com.example.androidbljoy.theme.OffWhite
+import com.example.androidbljoy.theme.isCarbonLcdTheme
 import kotlin.math.abs
+
+/**
+ * Draws a subtle dot-matrix LCD background grid on monochrome LCD screens.
+ */
+fun Modifier.lcdDotMatrixBackground(): Modifier = this.drawBehind {
+    drawRect(color = LcdScreenBg)
+    val step = 4.dp.toPx()
+    var y = 0f
+    while (y < size.height) {
+        drawLine(
+            color = LcdPixelGrid.copy(alpha = 0.45f),
+            start = Offset(0f, y),
+            end = Offset(size.width, y),
+            strokeWidth = 1f
+        )
+        y += step
+    }
+    var x = 0f
+    while (x < size.width) {
+        drawLine(
+            color = LcdPixelGrid.copy(alpha = 0.45f),
+            start = Offset(x, 0f),
+            end = Offset(x, size.height),
+            strokeWidth = 1f
+        )
+        x += step
+    }
+}
 
 @Composable
 fun VehicleVisualizer(
@@ -59,185 +95,239 @@ fun VehicleVisualizer(
     servoAngle: Int,
     modifier: Modifier = Modifier
 ) {
+    val lcdMode = isCarbonLcdTheme
+
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .border(1.dp, CyberPrimary.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
-        colors = CardDefaults.cardColors(containerColor = CyberSurface.copy(alpha = 0.85f)),
-        shape = RoundedCornerShape(12.dp)
+            .border(
+                width = if (lcdMode) 4.dp else 1.dp,
+                color = if (lcdMode) LcdBezelOuter else CyberPrimary.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(if (lcdMode) 10.dp else 12.dp)
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (lcdMode) LcdBezelInner else CyberSurface.copy(alpha = 0.85f)
+        ),
+        shape = RoundedCornerShape(if (lcdMode) 10.dp else 12.dp)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+                .padding(if (lcdMode) 4.dp else 0.dp)
+                .clip(RoundedCornerShape(if (lcdMode) 6.dp else 12.dp))
+                .then(
+                    if (lcdMode) {
+                        Modifier
+                            .lcdDotMatrixBackground()
+                            .border(1.5.dp, LcdInk.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
+                    } else {
+                        Modifier
+                    }
+                )
         ) {
-            // Mode Header Badge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = when (vehicleType) {
-                        DrivingMode.DUAL_DC -> "DOBLE MOTOR DC"
-                        DrivingMode.TANK -> "ORUGAS TANQUE"
-                        DrivingMode.SERVO_CAR -> "COCHE RC + SERVO"
-                        DrivingMode.ARCADE -> "ARCADE DIFERENCIAL"
-                    },
-                    color = CyberPrimary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
-                )
-
-                Text(
-                    text = "TELEMETRÍA PWM",
-                    color = MutedText,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Main Graphic Arena
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxSize()
+                    .padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                when (vehicleType) {
-                    DrivingMode.DUAL_DC -> {
-                        // Left Motor Bar (Traction)
-                        PwmVerticalBar(
-                            label = "TRACCIÓN (A)",
-                            value = motorA,
-                            modifier = Modifier.width(38.dp).fillMaxHeight()
-                        )
+                // Mode Header Badge
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (lcdMode) {
+                                Modifier
+                                    .background(LcdInk, RoundedCornerShape(3.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            } else {
+                                Modifier
+                            }
+                        ),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = when (vehicleType) {
+                            DrivingMode.DUAL_DC -> "DOBLE MOTOR DC"
+                            DrivingMode.TANK -> "ORUGAS TANQUE"
+                            DrivingMode.SERVO_CAR -> "COCHE RC + SERVO"
+                            DrivingMode.ARCADE -> "ARCADE DIFERENCIAL"
+                        },
+                        color = if (lcdMode) LcdScreenBg else CyberPrimary,
+                        fontSize = 11.sp,
+                        fontFamily = if (lcdMode) FontFamily.Monospace else FontFamily.Default,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp
+                    )
 
-                        // Central Car Graphic (Rear Wheels with PWM bars, Front Wheels with discrete turn)
-                        DualMotorChassisGraphic(
-                            motorA = motorA,
-                            motorB = motorB,
-                            isArcade = false,
-                            modifier = Modifier.weight(1f).fillMaxHeight()
-                        )
+                    Text(
+                        text = if (lcdMode) "LCD TELEM" else "TELEMETRÍA PWM",
+                        color = if (lcdMode) LcdScreenBg.copy(alpha = 0.85f) else MutedText,
+                        fontSize = 9.sp,
+                        fontFamily = if (lcdMode) FontFamily.Monospace else FontFamily.Default,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
-                        // Right Directional Bar (Discrete Steering Left / Right)
-                        DirectionalMotorBar(
-                            label = "DIRECCIÓN (B)",
-                            value = motorB,
-                            modifier = Modifier.width(38.dp).fillMaxHeight()
-                        )
-                    }
+                Spacer(modifier = Modifier.height(4.dp))
 
-                    DrivingMode.ARCADE -> {
-                        // Left Motor PWM Bar
-                        PwmVerticalBar(
-                            label = "MTR A (Izq)",
-                            value = motorA,
-                            modifier = Modifier.width(36.dp).fillMaxHeight()
-                        )
+                // Main Graphic Arena
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    when (vehicleType) {
+                        DrivingMode.DUAL_DC -> {
+                            // Left Motor Bar (Traction)
+                            PwmVerticalBar(
+                                label = "TRACCIÓN (A)",
+                                value = motorA,
+                                modifier = Modifier.width(38.dp).fillMaxHeight()
+                            )
 
-                        DualMotorChassisGraphic(
-                            motorA = motorA,
-                            motorB = motorB,
-                            isArcade = true,
-                            modifier = Modifier.weight(1f).fillMaxHeight()
-                        )
+                            // Central Car Graphic (Rear Wheels with PWM bars, Front Wheels with discrete turn)
+                            DualMotorChassisGraphic(
+                                motorA = motorA,
+                                motorB = motorB,
+                                isArcade = false,
+                                modifier = Modifier.weight(1f).fillMaxHeight()
+                            )
 
-                        // Right Motor PWM Bar
-                        PwmVerticalBar(
-                            label = "MTR B (Der)",
-                            value = motorB,
-                            modifier = Modifier.width(36.dp).fillMaxHeight()
-                        )
-                    }
+                            // Right Directional Bar (Discrete Steering Left / Right)
+                            DirectionalMotorBar(
+                                label = "DIRECCIÓN (B)",
+                                value = motorB,
+                                modifier = Modifier.width(38.dp).fillMaxHeight()
+                            )
+                        }
 
-                    DrivingMode.TANK -> {
-                        // Left Track Bar
-                        PwmVerticalBar(
-                            label = "ORUGA IZQ",
-                            value = motorA,
-                            modifier = Modifier.width(36.dp).fillMaxHeight()
-                        )
+                        DrivingMode.ARCADE -> {
+                            // Left Motor PWM Bar
+                            PwmVerticalBar(
+                                label = "MTR A (Izq)",
+                                value = motorA,
+                                modifier = Modifier.width(36.dp).fillMaxHeight()
+                            )
 
-                        // Tank Chassis Graphic
-                        TankChassisGraphic(
-                            trackLeft = motorA,
-                            trackRight = motorB,
-                            modifier = Modifier.weight(1f).fillMaxHeight()
-                        )
+                            DualMotorChassisGraphic(
+                                motorA = motorA,
+                                motorB = motorB,
+                                isArcade = true,
+                                modifier = Modifier.weight(1f).fillMaxHeight()
+                            )
 
-                        // Right Track Bar
-                        PwmVerticalBar(
-                            label = "ORUGA DER",
-                            value = motorB,
-                            modifier = Modifier.width(36.dp).fillMaxHeight()
-                        )
-                    }
+                            // Right Motor PWM Bar
+                            PwmVerticalBar(
+                                label = "MTR B (Der)",
+                                value = motorB,
+                                modifier = Modifier.width(36.dp).fillMaxHeight()
+                            )
+                        }
 
-                    DrivingMode.SERVO_CAR -> {
-                        // Throttle Motor Bar
-                        PwmVerticalBar(
-                            label = "TRACCIÓN",
-                            value = if (motorA != 0) motorA else motorB,
-                            modifier = Modifier.width(36.dp).fillMaxHeight()
-                        )
+                        DrivingMode.TANK -> {
+                            // Left Track Bar
+                            PwmVerticalBar(
+                                label = "ORUGA IZQ",
+                                value = motorA,
+                                modifier = Modifier.width(36.dp).fillMaxHeight()
+                            )
 
-                        // Servo Car with pivoting front wheels
-                        ServoCarChassisGraphic(
-                            throttle = if (motorA != 0) motorA else motorB,
-                            servoAngle = servoAngle,
-                            modifier = Modifier.weight(1f).fillMaxHeight()
-                        )
+                            // Tank Chassis Graphic
+                            TankChassisGraphic(
+                                trackLeft = motorA,
+                                trackRight = motorB,
+                                modifier = Modifier.weight(1f).fillMaxHeight()
+                            )
 
-                        // Servo Angle Dial / Bar
-                        ServoAngleBar(
-                            angle = servoAngle,
-                            modifier = Modifier.width(42.dp).fillMaxHeight()
-                        )
+                            // Right Track Bar
+                            PwmVerticalBar(
+                                label = "ORUGA DER",
+                                value = motorB,
+                                modifier = Modifier.width(36.dp).fillMaxHeight()
+                            )
+                        }
+
+                        DrivingMode.SERVO_CAR -> {
+                            // Throttle Motor Bar
+                            PwmVerticalBar(
+                                label = "TRACCIÓN",
+                                value = if (motorA != 0) motorA else motorB,
+                                modifier = Modifier.width(36.dp).fillMaxHeight()
+                            )
+
+                            // Servo Car with pivoting front wheels
+                            ServoCarChassisGraphic(
+                                throttle = if (motorA != 0) motorA else motorB,
+                                servoAngle = servoAngle,
+                                modifier = Modifier.weight(1f).fillMaxHeight()
+                            )
+
+                            // Servo Angle Dial / Bar
+                            ServoAngleBar(
+                                angle = servoAngle,
+                                modifier = Modifier.width(42.dp).fillMaxHeight()
+                            )
+                        }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
-            // Bottom quick readout numbers
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
-                horizontalArrangement = Arrangement.SpaceAround,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "A: ${if (motorA > 0) "+$motorA" else "$motorA"}",
-                    color = if (motorA > 0) NeonGreen else if (motorA < 0) NeonRed else MutedText,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "B: ${if (motorB > 0) "+$motorB" else "$motorB"}",
-                    color = if (motorB > 0) NeonGreen else if (motorB < 0) NeonRed else MutedText,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                if (vehicleType == DrivingMode.SERVO_CAR) {
+                // Bottom quick readout numbers
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            if (lcdMode) LcdScreenBgInner else Color.Black.copy(alpha = 0.5f),
+                            RoundedCornerShape(if (lcdMode) 4.dp else 6.dp)
+                        )
+                        .then(
+                            if (lcdMode) Modifier.border(1.dp, LcdInk, RoundedCornerShape(4.dp))
+                            else Modifier
+                        )
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                    horizontalArrangement = Arrangement.SpaceAround,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val colorA = if (lcdMode) {
+                        if (motorA != 0) LcdInk else LcdInkSecondary
+                    } else {
+                        if (motorA > 0) NeonGreen else if (motorA < 0) NeonRed else MutedText
+                    }
+                    val colorB = if (lcdMode) {
+                        if (motorB != 0) LcdInk else LcdInkSecondary
+                    } else {
+                        if (motorB > 0) NeonGreen else if (motorB < 0) NeonRed else MutedText
+                    }
+
                     Text(
-                        text = "SERVO: $servoAngle°",
-                        color = CyberPrimary,
+                        text = "A: ${if (motorA > 0) "+$motorA" else "$motorA"}",
+                        color = colorA,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
+                    Text(
+                        text = "B: ${if (motorB > 0) "+$motorB" else "$motorB"}",
+                        color = colorB,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (vehicleType == DrivingMode.SERVO_CAR) {
+                        Text(
+                            text = "SERVO: $servoAngle°",
+                            color = if (lcdMode) LcdInk else CyberPrimary,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }
@@ -251,15 +341,20 @@ fun PwmVerticalBar(
     maxValue: Int = 255,
     modifier: Modifier = Modifier
 ) {
+    val lcdMode = isCarbonLcdTheme
     val clamped = value.coerceIn(-maxValue, maxValue)
     val ratio = abs(clamped) / maxValue.toFloat()
     val isForward = clamped > 0
     val isReverse = clamped < 0
 
-    val barColor = when {
-        isForward -> NeonGreen
-        isReverse -> NeonAmber
-        else -> CyberSurfaceVariant
+    val barColor = if (lcdMode) {
+        if (isForward || isReverse) LcdInk else LcdGhostSegment
+    } else {
+        when {
+            isForward -> NeonGreen
+            isReverse -> NeonAmber
+            else -> CyberSurfaceVariant
+        }
     }
 
     Column(
@@ -269,8 +364,9 @@ fun PwmVerticalBar(
     ) {
         Text(
             text = label,
-            color = MutedText,
+            color = if (lcdMode) LcdInk else MutedText,
             fontSize = 7.sp,
+            fontFamily = if (lcdMode) FontFamily.Monospace else FontFamily.Default,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
             maxLines = 1
@@ -282,9 +378,16 @@ fun PwmVerticalBar(
             modifier = Modifier
                 .width(14.dp)
                 .weight(1f)
-                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
-                .border(1.dp, CyberSurfaceVariant, RoundedCornerShape(4.dp))
-                .clip(RoundedCornerShape(4.dp)),
+                .background(
+                    if (lcdMode) LcdGhostSegment.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.6f),
+                    RoundedCornerShape(if (lcdMode) 2.dp else 4.dp)
+                )
+                .border(
+                    width = if (lcdMode) 1.5.dp else 1.dp,
+                    color = if (lcdMode) LcdInk else CyberSurfaceVariant,
+                    shape = RoundedCornerShape(if (lcdMode) 2.dp else 4.dp)
+                )
+                .clip(RoundedCornerShape(if (lcdMode) 2.dp else 4.dp)),
             contentAlignment = Alignment.Center
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -292,10 +395,10 @@ fun PwmVerticalBar(
 
                 // Center zero line
                 drawLine(
-                    color = CyberPrimary.copy(alpha = 0.7f),
+                    color = if (lcdMode) LcdInk else CyberPrimary.copy(alpha = 0.7f),
                     start = Offset(0f, midY),
                     end = Offset(size.width, midY),
-                    strokeWidth = 1.5f
+                    strokeWidth = if (lcdMode) 2f else 1.5f
                 )
 
                 if (isForward) {
@@ -322,7 +425,7 @@ fun PwmVerticalBar(
 
         Text(
             text = "$clamped",
-            color = if (clamped != 0) barColor else MutedText,
+            color = if (lcdMode) LcdInk else if (clamped != 0) barColor else MutedText,
             fontSize = 8.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold
@@ -335,6 +438,7 @@ fun ServoAngleBar(
     angle: Int,
     modifier: Modifier = Modifier
 ) {
+    val lcdMode = isCarbonLcdTheme
     val clamped = angle.coerceIn(0, 180)
     // 90 is center (0 offset), -90 to +90 offset
     val offsetFromCenter = clamped - 90
@@ -347,8 +451,9 @@ fun ServoAngleBar(
     ) {
         Text(
             text = "SERVO",
-            color = MutedText,
+            color = if (lcdMode) LcdInk else MutedText,
             fontSize = 7.sp,
+            fontFamily = if (lcdMode) FontFamily.Monospace else FontFamily.Default,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
@@ -359,17 +464,25 @@ fun ServoAngleBar(
             modifier = Modifier
                 .width(14.dp)
                 .weight(1f)
-                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
-                .border(1.dp, CyberSurfaceVariant, RoundedCornerShape(4.dp))
-                .clip(RoundedCornerShape(4.dp)),
+                .background(
+                    if (lcdMode) LcdGhostSegment.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.6f),
+                    RoundedCornerShape(if (lcdMode) 2.dp else 4.dp)
+                )
+                .border(
+                    width = if (lcdMode) 1.5.dp else 1.dp,
+                    color = if (lcdMode) LcdInk else CyberSurfaceVariant,
+                    shape = RoundedCornerShape(if (lcdMode) 2.dp else 4.dp)
+                )
+                .clip(RoundedCornerShape(if (lcdMode) 2.dp else 4.dp)),
             contentAlignment = Alignment.Center
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val midY = size.height / 2f
+                val activeColor = if (lcdMode) LcdInk else CyberPrimary
 
                 // Center zero line (90°)
                 drawLine(
-                    color = CyberPrimary,
+                    color = activeColor,
                     start = Offset(0f, midY),
                     end = Offset(size.width, midY),
                     strokeWidth = 2f
@@ -379,7 +492,7 @@ fun ServoAngleBar(
                     val barHeight = midY * ratio
                     val top = if (offsetFromCenter > 0) midY - barHeight else midY
                     drawRoundRect(
-                        color = CyberPrimary,
+                        color = activeColor,
                         topLeft = Offset(0f, top),
                         size = Size(size.width, barHeight),
                         cornerRadius = CornerRadius(2f, 2f)
@@ -392,7 +505,7 @@ fun ServoAngleBar(
 
         Text(
             text = "$clamped°",
-            color = CyberPrimary,
+            color = if (lcdMode) LcdInk else CyberPrimary,
             fontSize = 8.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold
@@ -406,6 +519,7 @@ fun DirectionalMotorBar(
     value: Int,
     modifier: Modifier = Modifier
 ) {
+    val lcdMode = isCarbonLcdTheme
     val isLeft = value < -15
     val isRight = value > 15
     val isCenter = !isLeft && !isRight
@@ -417,8 +531,9 @@ fun DirectionalMotorBar(
     ) {
         Text(
             text = label,
-            color = MutedText,
+            color = if (lcdMode) LcdInk else MutedText,
             fontSize = 7.sp,
+            fontFamily = if (lcdMode) FontFamily.Monospace else FontFamily.Default,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
             maxLines = 1
@@ -430,8 +545,15 @@ fun DirectionalMotorBar(
             modifier = Modifier
                 .width(24.dp)
                 .weight(1f)
-                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
-                .border(1.dp, CyberSurfaceVariant, RoundedCornerShape(4.dp))
+                .background(
+                    if (lcdMode) LcdGhostSegment.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.6f),
+                    RoundedCornerShape(if (lcdMode) 2.dp else 4.dp)
+                )
+                .border(
+                    width = if (lcdMode) 1.5.dp else 1.dp,
+                    color = if (lcdMode) LcdInk else CyberSurfaceVariant,
+                    shape = RoundedCornerShape(if (lcdMode) 2.dp else 4.dp)
+                )
                 .padding(2.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -440,16 +562,21 @@ fun DirectionalMotorBar(
                 verticalArrangement = Arrangement.SpaceBetween,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                val activeBg = if (lcdMode) LcdInk else NeonGreen
+                val inactiveBg = if (lcdMode) LcdGhostSegment.copy(alpha = 0.5f) else CyberSurfaceVariant.copy(alpha = 0.25f)
+                val activeFg = if (lcdMode) LcdScreenBg else Color.Black
+                val inactiveFg = if (lcdMode) LcdInkSecondary else MutedText
+
                 // Left Turn Indicator
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(if (isLeft) NeonGreen else CyberSurfaceVariant.copy(alpha = 0.25f)),
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(if (isLeft) activeBg else inactiveBg),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("◄", color = if (isLeft) Color.Black else MutedText, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                    Text("◄", color = if (isLeft) activeFg else inactiveFg, fontSize = 9.sp, fontWeight = FontWeight.Black)
                 }
 
                 Spacer(modifier = Modifier.height(2.dp))
@@ -459,11 +586,21 @@ fun DirectionalMotorBar(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(0.8f)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(if (isCenter) CyberPrimary.copy(alpha = 0.5f) else CyberSurfaceVariant.copy(alpha = 0.2f)),
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(
+                            if (isCenter) {
+                                if (lcdMode) LcdInk else CyberPrimary.copy(alpha = 0.5f)
+                            } else inactiveBg
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("●", color = if (isCenter) CyberPrimary else MutedText.copy(alpha = 0.5f), fontSize = 7.sp)
+                    Text(
+                        "●",
+                        color = if (isCenter) {
+                            if (lcdMode) LcdScreenBg else CyberPrimary
+                        } else inactiveFg,
+                        fontSize = 7.sp
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(2.dp))
@@ -473,11 +610,11 @@ fun DirectionalMotorBar(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .clip(RoundedCornerShape(3.dp))
-                        .background(if (isRight) NeonGreen else CyberSurfaceVariant.copy(alpha = 0.25f)),
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(if (isRight) activeBg else inactiveBg),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("►", color = if (isRight) Color.Black else MutedText, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                    Text("►", color = if (isRight) activeFg else inactiveFg, fontSize = 9.sp, fontWeight = FontWeight.Black)
                 }
             }
         }
@@ -490,7 +627,7 @@ fun DirectionalMotorBar(
                 isRight -> "DER ►"
                 else -> "RECTO"
             },
-            color = if (!isCenter) NeonGreen else MutedText,
+            color = if (lcdMode) LcdInk else if (!isCenter) NeonGreen else MutedText,
             fontSize = 8.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold
@@ -505,6 +642,8 @@ fun DualMotorChassisGraphic(
     isArcade: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val lcdMode = isCarbonLcdTheme
+
     if (isArcade) {
         // Arcade Differential Chassis
         Box(
@@ -517,17 +656,17 @@ fun DualMotorChassisGraphic(
 
                 // Central Rover Chassis Body
                 drawRoundRect(
-                    color = CyberSurfaceVariant.copy(alpha = 0.7f),
+                    color = if (lcdMode) LcdGhostSegment else CyberSurfaceVariant.copy(alpha = 0.7f),
                     topLeft = Offset(centerX - 24.dp.toPx(), centerY - 38.dp.toPx()),
                     size = Size(48.dp.toPx(), 76.dp.toPx()),
                     cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx())
                 )
                 drawRoundRect(
-                    color = CyberPrimary.copy(alpha = 0.6f),
+                    color = if (lcdMode) LcdInk else CyberPrimary.copy(alpha = 0.6f),
                     topLeft = Offset(centerX - 24.dp.toPx(), centerY - 38.dp.toPx()),
                     size = Size(48.dp.toPx(), 76.dp.toPx()),
                     cornerRadius = CornerRadius(10.dp.toPx(), 10.dp.toPx()),
-                    style = Stroke(width = 1.5.dp.toPx())
+                    style = Stroke(width = if (lcdMode) 2.dp.toPx() else 1.5.dp.toPx())
                 )
 
                 // Front direction indicator arrow
@@ -537,15 +676,23 @@ fun DualMotorChassisGraphic(
                     lineTo(centerX + 8.dp.toPx(), centerY - 16.dp.toPx())
                     close()
                 }
-                drawPath(arrowPath, color = CyberPrimary)
+                drawPath(arrowPath, color = if (lcdMode) LcdInk else CyberPrimary)
 
                 // Left Wheels (Motor A)
-                val leftColor = if (motorA > 0) NeonGreen else if (motorA < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
+                val leftColor = if (lcdMode) {
+                    if (motorA != 0) LcdInk else LcdInkSecondary.copy(alpha = 0.55f)
+                } else {
+                    if (motorA > 0) NeonGreen else if (motorA < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
+                }
                 drawRoundRect(color = leftColor, topLeft = Offset(centerX - 38.dp.toPx(), centerY - 34.dp.toPx()), size = Size(10.dp.toPx(), 22.dp.toPx()), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()))
                 drawRoundRect(color = leftColor, topLeft = Offset(centerX - 38.dp.toPx(), centerY + 12.dp.toPx()), size = Size(10.dp.toPx(), 22.dp.toPx()), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()))
 
                 // Right Wheels (Motor B)
-                val rightColor = if (motorB > 0) NeonGreen else if (motorB < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
+                val rightColor = if (lcdMode) {
+                    if (motorB != 0) LcdInk else LcdInkSecondary.copy(alpha = 0.55f)
+                } else {
+                    if (motorB > 0) NeonGreen else if (motorB < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
+                }
                 drawRoundRect(color = rightColor, topLeft = Offset(centerX + 28.dp.toPx(), centerY - 34.dp.toPx()), size = Size(10.dp.toPx(), 22.dp.toPx()), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()))
                 drawRoundRect(color = rightColor, topLeft = Offset(centerX + 28.dp.toPx(), centerY + 12.dp.toPx()), size = Size(10.dp.toPx(), 22.dp.toPx()), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()))
             }
@@ -561,7 +708,11 @@ fun DualMotorChassisGraphic(
         }
         val animatedAngle by animateFloatAsState(targetValue = discreteAngle, animationSpec = tween(70), label = "dcSteer")
 
-        val tractionColor = if (motorA > 0) NeonGreen else if (motorA < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
+        val tractionColor = if (lcdMode) {
+            LcdInk
+        } else {
+            if (motorA > 0) NeonGreen else if (motorA < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
+        }
         val tractionRatio = (abs(motorA).coerceIn(0, 255) / 255f)
 
         Box(
@@ -579,28 +730,29 @@ fun DualMotorChassisGraphic(
 
                     // Car Chassis Body
                     drawRoundRect(
-                        color = CyberSurfaceVariant.copy(alpha = 0.8f),
+                        color = if (lcdMode) LcdGhostSegment else CyberSurfaceVariant.copy(alpha = 0.8f),
                         topLeft = Offset(centerX - 20.dp.toPx(), centerY - 38.dp.toPx()),
                         size = Size(40.dp.toPx(), 74.dp.toPx()),
                         cornerRadius = CornerRadius(8.dp.toPx(), 8.dp.toPx())
                     )
                     drawRoundRect(
-                        color = CyberPrimary.copy(alpha = 0.6f),
+                        color = if (lcdMode) LcdInk else CyberPrimary.copy(alpha = 0.6f),
                         topLeft = Offset(centerX - 20.dp.toPx(), centerY - 38.dp.toPx()),
                         size = Size(40.dp.toPx(), 74.dp.toPx()),
                         cornerRadius = CornerRadius(8.dp.toPx(), 8.dp.toPx()),
-                        style = Stroke(width = 1.5.dp.toPx())
+                        style = Stroke(width = if (lcdMode) 2.dp.toPx() else 1.5.dp.toPx())
                     )
 
                     // Axles
+                    val axleColor = if (lcdMode) LcdInk else CyberPrimary.copy(alpha = 0.6f)
                     drawLine(
-                        color = CyberPrimary.copy(alpha = 0.6f),
+                        color = axleColor,
                         start = Offset(centerX - 30.dp.toPx(), centerY - 24.dp.toPx()),
                         end = Offset(centerX + 30.dp.toPx(), centerY - 24.dp.toPx()),
                         strokeWidth = 2.dp.toPx()
                     )
                     drawLine(
-                        color = CyberPrimary.copy(alpha = 0.6f),
+                        color = axleColor,
                         start = Offset(centerX - 32.dp.toPx(), centerY + 24.dp.toPx()),
                         end = Offset(centerX + 32.dp.toPx(), centerY + 24.dp.toPx()),
                         strokeWidth = 2.dp.toPx()
@@ -613,9 +765,12 @@ fun DualMotorChassisGraphic(
                     val rightRearX = centerX + 26.dp.toPx()
                     val rearY = centerY + 11.dp.toPx()
 
+                    val wheelFrameBg = if (lcdMode) LcdGhostSegment else Color.Black.copy(alpha = 0.85f)
+                    val wheelFrameStroke = if (lcdMode) LcdInk else CyberPrimary.copy(alpha = 0.5f)
+
                     // Left Rear Wheel Frame & Bar
-                    drawRoundRect(color = Color.Black.copy(alpha = 0.85f), topLeft = Offset(leftRearX, rearY), size = Size(rearWheelW, rearWheelH), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()))
-                    drawRoundRect(color = CyberPrimary.copy(alpha = 0.5f), topLeft = Offset(leftRearX, rearY), size = Size(rearWheelW, rearWheelH), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()), style = Stroke(width = 1.dp.toPx()))
+                    drawRoundRect(color = wheelFrameBg, topLeft = Offset(leftRearX, rearY), size = Size(rearWheelW, rearWheelH), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()))
+                    drawRoundRect(color = wheelFrameStroke, topLeft = Offset(leftRearX, rearY), size = Size(rearWheelW, rearWheelH), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()), style = Stroke(width = 1.5.dp.toPx()))
                     if (tractionRatio > 0f) {
                         val barH = rearWheelH * tractionRatio
                         val barTop = if (motorA > 0) rearY + (rearWheelH - barH) else rearY
@@ -623,8 +778,8 @@ fun DualMotorChassisGraphic(
                     }
 
                     // Right Rear Wheel Frame & Bar
-                    drawRoundRect(color = Color.Black.copy(alpha = 0.85f), topLeft = Offset(rightRearX, rearY), size = Size(rearWheelW, rearWheelH), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()))
-                    drawRoundRect(color = CyberPrimary.copy(alpha = 0.5f), topLeft = Offset(rightRearX, rearY), size = Size(rearWheelW, rearWheelH), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()), style = Stroke(width = 1.dp.toPx()))
+                    drawRoundRect(color = wheelFrameBg, topLeft = Offset(rightRearX, rearY), size = Size(rearWheelW, rearWheelH), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()))
+                    drawRoundRect(color = wheelFrameStroke, topLeft = Offset(rightRearX, rearY), size = Size(rearWheelW, rearWheelH), cornerRadius = CornerRadius(3.dp.toPx(), 3.dp.toPx()), style = Stroke(width = 1.5.dp.toPx()))
                     if (tractionRatio > 0f) {
                         val barH = rearWheelH * tractionRatio
                         val barTop = if (motorA > 0) rearY + (rearWheelH - barH) else rearY
@@ -633,7 +788,11 @@ fun DualMotorChassisGraphic(
                 }
 
                 // FRONT WHEELS (Rotating Discretely Left or Right - NOT proportional)
-                val frontSteerColor = if (isTurnLeft || isTurnRight) NeonGreen else OffWhite.copy(alpha = 0.4f)
+                val frontSteerColor = if (lcdMode) {
+                    if (isTurnLeft || isTurnRight) LcdInk else LcdInkSecondary
+                } else {
+                    if (isTurnLeft || isTurnRight) NeonGreen else OffWhite.copy(alpha = 0.4f)
+                }
 
                 // Front Left Wheel
                 Box(
@@ -646,7 +805,7 @@ fun DualMotorChassisGraphic(
                         }
                         .size(width = 10.dp, height = 24.dp)
                         .background(frontSteerColor, RoundedCornerShape(3.dp))
-                        .border(1.dp, Color.Black.copy(alpha = 0.5f), RoundedCornerShape(3.dp))
+                        .border(1.dp, if (lcdMode) LcdInk else Color.Black.copy(alpha = 0.5f), RoundedCornerShape(3.dp))
                 )
 
                 // Front Right Wheel
@@ -660,7 +819,7 @@ fun DualMotorChassisGraphic(
                         }
                         .size(width = 10.dp, height = 24.dp)
                         .background(frontSteerColor, RoundedCornerShape(3.dp))
-                        .border(1.dp, Color.Black.copy(alpha = 0.5f), RoundedCornerShape(3.dp))
+                        .border(1.dp, if (lcdMode) LcdInk else Color.Black.copy(alpha = 0.5f), RoundedCornerShape(3.dp))
                 )
 
                 // Directional Turn Text Indicator
@@ -675,7 +834,7 @@ fun DualMotorChassisGraphic(
                             isTurnRight -> "GIRO DER ►►"
                             else -> "▲ RECTO ▲"
                         },
-                        color = if (isTurnLeft || isTurnRight) NeonGreen else MutedText,
+                        color = if (lcdMode) LcdInk else if (isTurnLeft || isTurnRight) NeonGreen else MutedText,
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
@@ -690,8 +849,9 @@ fun DualMotorChassisGraphic(
                 ) {
                     Text(
                         text = "RUEDAS TRASERAS PWM",
-                        color = MutedText,
+                        color = if (lcdMode) LcdInkSecondary else MutedText,
                         fontSize = 7.sp,
+                        fontFamily = if (lcdMode) FontFamily.Monospace else FontFamily.Default,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -706,6 +866,8 @@ fun TankChassisGraphic(
     trackRight: Int,
     modifier: Modifier = Modifier
 ) {
+    val lcdMode = isCarbonLcdTheme
+
     Box(
         modifier = modifier.padding(horizontal = 8.dp),
         contentAlignment = Alignment.Center
@@ -718,47 +880,52 @@ fun TankChassisGraphic(
 
             // Tank Main Hull
             drawRoundRect(
-                color = CyberSurfaceVariant,
+                color = if (lcdMode) LcdGhostSegment else CyberSurfaceVariant,
                 topLeft = Offset(centerX - 20.dp.toPx(), centerY - 34.dp.toPx()),
                 size = Size(40.dp.toPx(), 68.dp.toPx()),
                 cornerRadius = CornerRadius(6.dp.toPx(), 6.dp.toPx())
             )
             drawRoundRect(
-                color = CyberPrimary.copy(alpha = 0.5f),
+                color = if (lcdMode) LcdInk else CyberPrimary.copy(alpha = 0.5f),
                 topLeft = Offset(centerX - 20.dp.toPx(), centerY - 34.dp.toPx()),
                 size = Size(40.dp.toPx(), 68.dp.toPx()),
                 cornerRadius = CornerRadius(6.dp.toPx(), 6.dp.toPx()),
-                style = Stroke(width = 1.5.dp.toPx())
+                style = Stroke(width = if (lcdMode) 2.dp.toPx() else 1.5.dp.toPx())
             )
 
             // Turret circle
             drawCircle(
-                color = CyberPrimary.copy(alpha = 0.8f),
+                color = if (lcdMode) LcdInk else CyberPrimary.copy(alpha = 0.8f),
                 radius = 12.dp.toPx(),
                 center = Offset(centerX, centerY)
             )
 
             // Cannon Barrel pointing up
             drawLine(
-                color = CyberPrimary,
+                color = if (lcdMode) LcdInk else CyberPrimary,
                 start = Offset(centerX, centerY),
                 end = Offset(centerX, centerY - 32.dp.toPx()),
                 strokeWidth = 4.dp.toPx()
             )
 
             // Left Tread
-            val leftColor = if (trackLeft > 0) NeonGreen else if (trackLeft < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
+            val leftColor = if (lcdMode) {
+                if (trackLeft != 0) LcdInk else LcdInkSecondary
+            } else {
+                if (trackLeft > 0) NeonGreen else if (trackLeft < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
+            }
             drawRoundRect(
                 color = leftColor,
                 topLeft = Offset(centerX - 38.dp.toPx(), centerY - 40.dp.toPx()),
                 size = Size(14.dp.toPx(), 80.dp.toPx()),
                 cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
             )
+            val segLineColor = if (lcdMode) LcdScreenBg else Color.Black.copy(alpha = 0.6f)
             // Left tread inner segments
             for (i in 0..5) {
                 val ySeg = centerY - 35.dp.toPx() + (i * 14.dp.toPx())
                 drawLine(
-                    color = Color.Black.copy(alpha = 0.6f),
+                    color = segLineColor,
                     start = Offset(centerX - 37.dp.toPx(), ySeg),
                     end = Offset(centerX - 25.dp.toPx(), ySeg),
                     strokeWidth = 2.dp.toPx()
@@ -766,7 +933,11 @@ fun TankChassisGraphic(
             }
 
             // Right Tread
-            val rightColor = if (trackRight > 0) NeonGreen else if (trackRight < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
+            val rightColor = if (lcdMode) {
+                if (trackRight != 0) LcdInk else LcdInkSecondary
+            } else {
+                if (trackRight > 0) NeonGreen else if (trackRight < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
+            }
             drawRoundRect(
                 color = rightColor,
                 topLeft = Offset(centerX + 24.dp.toPx(), centerY - 40.dp.toPx()),
@@ -777,7 +948,7 @@ fun TankChassisGraphic(
             for (i in 0..5) {
                 val ySeg = centerY - 35.dp.toPx() + (i * 14.dp.toPx())
                 drawLine(
-                    color = Color.Black.copy(alpha = 0.6f),
+                    color = segLineColor,
                     start = Offset(centerX + 25.dp.toPx(), ySeg),
                     end = Offset(centerX + 37.dp.toPx(), ySeg),
                     strokeWidth = 2.dp.toPx()
@@ -793,6 +964,7 @@ fun ServoCarChassisGraphic(
     servoAngle: Int,
     modifier: Modifier = Modifier
 ) {
+    val lcdMode = isCarbonLcdTheme
     // Map 0..180 servo degrees to steering wheel visual deflection (-35° to +35°)
     val steerAngle = ((servoAngle - 90) * 0.40f).coerceIn(-35f, 35f)
     val animatedSteerAngle by animateFloatAsState(targetValue = steerAngle, animationSpec = tween(60), label = "steer")
@@ -812,22 +984,23 @@ fun ServoCarChassisGraphic(
 
                 // Chassis Body
                 drawRoundRect(
-                    color = CyberSurfaceVariant.copy(alpha = 0.8f),
+                    color = if (lcdMode) LcdGhostSegment else CyberSurfaceVariant.copy(alpha = 0.8f),
                     topLeft = Offset(centerX - 20.dp.toPx(), centerY - 36.dp.toPx()),
                     size = Size(40.dp.toPx(), 72.dp.toPx()),
                     cornerRadius = CornerRadius(8.dp.toPx(), 8.dp.toPx())
                 )
                 drawRoundRect(
-                    color = CyberPrimary.copy(alpha = 0.6f),
+                    color = if (lcdMode) LcdInk else CyberPrimary.copy(alpha = 0.6f),
                     topLeft = Offset(centerX - 20.dp.toPx(), centerY - 36.dp.toPx()),
                     size = Size(40.dp.toPx(), 72.dp.toPx()),
                     cornerRadius = CornerRadius(8.dp.toPx(), 8.dp.toPx()),
-                    style = Stroke(width = 1.5.dp.toPx())
+                    style = Stroke(width = if (lcdMode) 2.dp.toPx() else 1.5.dp.toPx())
                 )
 
+                val axleColor = if (lcdMode) LcdInk else CyberPrimary.copy(alpha = 0.6f)
                 // Front Axle Bar
                 drawLine(
-                    color = CyberPrimary.copy(alpha = 0.6f),
+                    color = axleColor,
                     start = Offset(centerX - 28.dp.toPx(), centerY - 24.dp.toPx()),
                     end = Offset(centerX + 28.dp.toPx(), centerY - 24.dp.toPx()),
                     strokeWidth = 2.dp.toPx()
@@ -835,14 +1008,18 @@ fun ServoCarChassisGraphic(
 
                 // Rear Axle Bar
                 drawLine(
-                    color = CyberPrimary.copy(alpha = 0.6f),
+                    color = axleColor,
                     start = Offset(centerX - 28.dp.toPx(), centerY + 24.dp.toPx()),
                     end = Offset(centerX + 28.dp.toPx(), centerY + 24.dp.toPx()),
                     strokeWidth = 2.dp.toPx()
                 )
 
                 // Rear Wheels (Driven by throttle)
-                val rearColor = if (throttle > 0) NeonGreen else if (throttle < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
+                val rearColor = if (lcdMode) {
+                    if (throttle != 0) LcdInk else LcdInkSecondary
+                } else {
+                    if (throttle > 0) NeonGreen else if (throttle < 0) NeonAmber else OffWhite.copy(alpha = 0.4f)
+                }
                 // Rear Left Wheel
                 drawRoundRect(
                     color = rearColor,
@@ -860,7 +1037,7 @@ fun ServoCarChassisGraphic(
 
                 // Cockpit windshield accent
                 drawRoundRect(
-                    color = CyberPrimary.copy(alpha = 0.3f),
+                    color = if (lcdMode) LcdInk.copy(alpha = 0.7f) else CyberPrimary.copy(alpha = 0.3f),
                     topLeft = Offset(centerX - 12.dp.toPx(), centerY - 14.dp.toPx()),
                     size = Size(24.dp.toPx(), 22.dp.toPx()),
                     cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
@@ -877,8 +1054,8 @@ fun ServoCarChassisGraphic(
                         rotationZ = animatedSteerAngle
                     }
                     .size(width = 10.dp, height = 22.dp)
-                    .background(CyberPrimary, RoundedCornerShape(3.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(3.dp))
+                    .background(if (lcdMode) LcdInk else CyberPrimary, RoundedCornerShape(3.dp))
+                    .border(1.dp, if (lcdMode) LcdScreenBg else Color.White.copy(alpha = 0.4f), RoundedCornerShape(3.dp))
             )
 
             // Front Right Wheel
@@ -890,8 +1067,8 @@ fun ServoCarChassisGraphic(
                         rotationZ = animatedSteerAngle
                     }
                     .size(width = 10.dp, height = 22.dp)
-                    .background(CyberPrimary, RoundedCornerShape(3.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(3.dp))
+                    .background(if (lcdMode) LcdInk else CyberPrimary, RoundedCornerShape(3.dp))
+                    .border(1.dp, if (lcdMode) LcdScreenBg else Color.White.copy(alpha = 0.4f), RoundedCornerShape(3.dp))
             )
         }
     }

@@ -1,7 +1,7 @@
 {
-  "versionCode": 21,
-  "versionName": "1.20",
+  "versionCode": 22,
+  "versionName": "1.21",
   "apkUrl": "https://storage.googleapis.com/androidblejoy.firebasestorage.app/updates/app-debug.apk",
-  "releaseNotes": "Curvature Drive (Cheesy Drive) con Quick-Turn en el Mixer Arcade, y End Points unificados en RangeSlider (-255 a +255) para configurar bandas continuas asimetricas y de solo avance.",
+  "releaseNotes": "Nuevo tema Carbon & LCD (chasis en fibra de carbono, gimbals estilo TX16S con centro plateado y pantalla central LCD monocromatica), persistencia de tema y aviso directo para activar Ubicacion (GPS) y Bluetooth en el escaner BLE.",
   "forceUpdate": false
 }

@@ -17,9 +17,14 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.example.androidbljoy.theme.CyberPrimary
-import com.example.androidbljoy.theme.CyberSecondary
 import com.example.androidbljoy.theme.CyberSurfaceVariant
+import com.example.androidbljoy.theme.LcdBezelOuter
+import com.example.androidbljoy.theme.LcdInk
+import com.example.androidbljoy.theme.LcdInkSecondary
+import com.example.androidbljoy.theme.LcdScreenBg
+import com.example.androidbljoy.theme.NeonAmber
 import com.example.androidbljoy.theme.NeonGreen
+import com.example.androidbljoy.theme.isCarbonLcdTheme
 
 @Composable
 fun ExpoGraph(
@@ -29,28 +34,34 @@ fun ExpoGraph(
         .width(130.dp)
         .height(100.dp)
 ) {
+    val lcdMode = isCarbonLcdTheme
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(Color.Black.copy(alpha = 0.6f))
-            .border(1.dp, CyberSurfaceVariant, RoundedCornerShape(8.dp))
+            .background(if (lcdMode) LcdScreenBg else Color.Black.copy(alpha = 0.6f))
+            .border(
+                width = if (lcdMode) 2.5.dp else 1.dp,
+                color = if (lcdMode) LcdBezelOuter else CyberSurfaceVariant,
+                shape = RoundedCornerShape(8.dp)
+            )
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
             val midX = w / 2f
             val midY = h / 2f
-            val expo = expoPercent / 100f
 
             // Grid lines
+            val gridColor = if (lcdMode) LcdInkSecondary.copy(alpha = 0.45f) else CyberSurfaceVariant.copy(alpha = 0.5f)
             drawLine(
-                color = CyberSurfaceVariant.copy(alpha = 0.5f),
+                color = gridColor,
                 start = Offset(0f, midY),
                 end = Offset(w, midY),
                 strokeWidth = 1f
             )
             drawLine(
-                color = CyberSurfaceVariant.copy(alpha = 0.5f),
+                color = gridColor,
                 start = Offset(midX, 0f),
                 end = Offset(midX, h),
                 strokeWidth = 1f
@@ -58,7 +69,7 @@ fun ExpoGraph(
 
             // Linear reference dotted/faint diagonal
             drawLine(
-                color = Color.White.copy(alpha = 0.15f),
+                color = if (lcdMode) LcdInkSecondary.copy(alpha = 0.35f) else Color.White.copy(alpha = 0.15f),
                 start = Offset(0f, h),
                 end = Offset(w, 0f),
                 strokeWidth = 1f
@@ -86,7 +97,7 @@ fun ExpoGraph(
 
             drawPath(
                 path = curvePath,
-                color = if (expoPercent < 0) com.example.androidbljoy.theme.NeonAmber else CyberPrimary,
+                color = if (lcdMode) LcdInk else if (expoPercent < 0) NeonAmber else CyberPrimary,
                 style = Stroke(width = 2.dp.toPx())
             )
 
@@ -97,7 +108,7 @@ fun ExpoGraph(
             val dotY = midY - stickOutput * (h / 2f)
 
             drawCircle(
-                color = NeonGreen,
+                color = if (lcdMode) LcdInk else NeonGreen,
                 radius = 4.dp.toPx(),
                 center = Offset(dotX, dotY)
             )
